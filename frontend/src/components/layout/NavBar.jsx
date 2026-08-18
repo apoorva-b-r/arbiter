@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useTelemetry } from '../../context/TelemetryContext';
 import { 
-  Radio, 
+  Satellite, 
   Activity, 
   History, 
   ShieldCheck, 
@@ -39,11 +39,11 @@ export const NavBar = () => {
     <header className="navbar-container">
       <div className="navbar-brand">
         <div className="satellite-icon-box">
-          <Radio className="sat-icon" size={22} />
+          <Satellite className="sat-icon" size={24} strokeWidth={1.8} />
         </div>
         <div>
           <h1 className="brand-title">ARBITER</h1>
-          <span className="brand-subtitle">MISSION CONTROL • POCKETQUBE GROUND STATION</span>
+          <span className="brand-subtitle"></span>
         </div>
       </div>
 
@@ -71,17 +71,6 @@ export const NavBar = () => {
       </nav>
 
       <div className="navbar-status">
-        {/* Pass Status Pill */}
-        <div className="pass-status-badge">
-          <span className={`status-dot ${telemetry.passStatus === 'ACTIVE' ? 'status-dot-active' : 'status-dot-idle'}`}></span>
-          <span className="mono">{telemetry.passStatus === 'ACTIVE' ? `PASS ACTIVE (${telemetry.passTimeRemainingSec}s)` : 'PASS IDLE'}</span>
-        </div>
-
-        {/* UTC Clock */}
-        <div className="utc-clock mono">
-          <Clock size={14} />
-          <span>{utcTime}</span>
-        </div>
 
         {/* User Operator Info */}
         <div className="operator-badge">

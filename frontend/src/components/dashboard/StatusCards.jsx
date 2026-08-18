@@ -11,16 +11,10 @@ export const StatusCards = () => {
     return 'var(--accent-red)';
   };
 
-  const getLinkColor = (val) => {
-    if (val > 70) return 'var(--accent-green)';
-    if (val > 40) return 'var(--accent-amber)';
-    return 'var(--accent-red)';
-  };
-
   return (
     <div className="status-cards-grid">
       {/* Battery Status Card */}
-      <div className="card status-card">
+      <div className="card status-card status-card-green">
         <div className="status-card-header">
           <span className="card-label">SUBSYSTEM EPS</span>
           <div className="icon-badge" style={{ color: getBatteryColor(telemetry.battery) }}>
@@ -49,10 +43,10 @@ export const StatusCards = () => {
       </div>
 
       {/* Link Quality Status Card */}
-      <div className="card status-card">
+      <div className="card status-card status-card-red">
         <div className="status-card-header">
           <span className="card-label">RF LINK QUALITY</span>
-          <div className="icon-badge" style={{ color: getLinkColor(telemetry.linkQuality) }}>
+          <div className="icon-badge" style={{ color: 'var(--accent-red)' }}>
             <Signal size={20} />
           </div>
         </div>
@@ -66,19 +60,19 @@ export const StatusCards = () => {
               className="progress-bar-fill"
               style={{
                 width: `${telemetry.linkQuality}%`,
-                backgroundColor: getLinkColor(telemetry.linkQuality)
+                backgroundColor: 'var(--accent-red)'
               }}
             />
           </div>
         </div>
         <div className="status-card-footer">
-          <span className="badge badge-blue">UHF 437.500 MHz</span>
+          <span className="badge badge-red">UHF 437.500 MHz</span>
           <span className="mono text-muted text-xs">-92 dBm RSSI</span>
         </div>
       </div>
 
       {/* Active Transmission Mode Card */}
-      <div className="card status-card">
+      <div className="card status-card status-card-purple">
         <div className="status-card-header">
           <span className="card-label">ACTIVE TRANSMISSION MODE</span>
           <div className="icon-badge" style={{ color: 'var(--accent-purple)' }}>
@@ -110,11 +104,16 @@ export const StatusCards = () => {
         }
 
         .status-card {
+          --card-glow: var(--accent-blue);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           height: 100%;
         }
+
+        .status-card-green { --card-glow: var(--accent-green); }
+        .status-card-red { --card-glow: var(--accent-red); }
+        .status-card-purple { --card-glow: var(--accent-purple); }
 
         .status-card-header {
           display: flex;
