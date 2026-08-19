@@ -8,6 +8,7 @@ import { Rocket, Clock, ShieldAlert, CheckCircle2 } from 'lucide-react';
 export const Deployment = () => {
   const {
     deployment,
+    startDeploymentSequence,
     transitionDeploymentState,
     triggerContingency,
     resolveContingencyAction
@@ -31,7 +32,8 @@ export const Deployment = () => {
         <StateMachineView
           deploymentState={deployment}
           onSelectState={transitionDeploymentState}
-          onSimulateContingency={() => triggerContingency('POD DEPLOYER SIGNAL CONFIRMATION TIMEOUT (>60s)')}
+          onStartSequence={startDeploymentSequence}
+          onSimulateContingency={() => triggerContingency('DEPLOYMENT SIGNAL ACKNOWLEDGEMENT TIMEOUT EXCEEDED (>15s). NO SEPARATION BEACON RECEIVED.')}
         />
 
         {/* State Transition Log Timeline */}
@@ -48,7 +50,13 @@ export const Deployment = () => {
             {deployment.historyLogs.map((log, idx) => (
               <div key={idx} className="timeline-item">
                 <div className="timeline-marker">
-                  <CheckCircle2 size={16} className="text-green" />
+                  {log.type === 'warning' ? (
+                    <ShieldAlert size={16} style={{ color: 'var(--accent-amber)' }} />
+                  ) : log.type === 'success' ? (
+                    <CheckCircle2 size={16} style={{ color: 'var(--accent-green)' }} />
+                  ) : (
+                    <Clock size={16} style={{ color: 'var(--accent-blue)' }} />
+                  )}
                 </div>
                 <div className="timeline-body">
                   <div className="timeline-meta">

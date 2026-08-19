@@ -212,23 +212,21 @@ export const MOCK_VALIDATION_RUNS = [
 ];
 
 export const MOCK_DEPLOYMENT_STATE = {
-  currentStateIndex: 3, // 0: Stowed, 1: Release triggered, 2: Separation confirmed, 3: Initialization, 4: Commissioning, 5: Operational
+  currentStateIndex: 0,
   states: [
-    { id: 'STOWED', label: '1. Stowed', description: 'PocketQube contained in launch deployer pod.' },
-    { id: 'RELEASE_TRIGGERED', label: '2. Release Triggered', description: 'Pod deployment signal fired from launch vehicle.' },
-    { id: 'SEPARATION_CONFIRMED', label: '3. Separation Confirmed', description: 'Deployer door microswitch opened. Satellite ejected.' },
-    { id: 'INITIALIZATION', label: '4. Initialization', description: '30-minute timer active. Solar panel & antenna deployment.' },
-    { id: 'COMMISSIONING', label: '5. Commissioning', description: 'Subsystem checkout: EPS, ADCS, TT&C, Radio beacon live.' },
-    { id: 'OPERATIONAL', label: '6. Operational', description: 'Nominal mission orbit operations engaged.' }
+    { id: 'STOWED', label: '1. Stowed', description: 'PocketQube contained in launch deployer pod. Awaiting launch vehicle deployment signal.' },
+    { id: 'RELEASE_TRIGGERED', label: '2. Release Triggered', description: 'Pod deployment signal fired from launch vehicle. Spring mechanism activated — satellite physically leaving pod.' },
+    { id: 'SEPARATION_CONFIRMED', label: '3. Separation Confirmed', description: 'Awaiting confirmation signal from satellite. First RF beacon expected within timeout window.' },
+    { id: 'INITIALIZATION', label: '4. Initialization', description: '30-minute silence period active. Onboard computer booting. Solar panels and antenna deployment in progress.' },
+    { id: 'COMMISSIONING', label: '5. Commissioning', description: 'Subsystem checkout underway: EPS, ADCS, TT&C, AI router. Radio beacon live on 437.500 MHz.' },
+    { id: 'OPERATIONAL', label: '6. Operational', description: 'All systems nominal. Mission operations engaged. Handover to ground station complete.' }
   ],
   contingencyActive: false,
   contingencyMessage: '',
-  timeoutDurationSec: 60,
-  timeElapsedSec: 42,
+  timeoutDurationSec: 15,
+  timeElapsedSec: 0,
   historyLogs: [
-    { timestamp: '12:00:05 UTC', event: 'POD DEPLOYER SIGNAL DETECTED', state: 'RELEASE_TRIGGERED' },
-    { timestamp: '12:00:12 UTC', event: 'MECHANICAL SEPARATION SWITCH CONFIRMED', state: 'SEPARATION_CONFIRMED' },
-    { timestamp: '12:00:30 UTC', event: 'SATELLITE BUS POWER ON - INITIATING 30-MIN SILENCE', state: 'INITIALIZATION' }
+    { timestamp: '—', event: 'SYSTEM READY — AWAITING LAUNCH VEHICLE DEPLOYMENT COMMAND', state: 'STOWED', type: 'info' }
   ]
 };
 
