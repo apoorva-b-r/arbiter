@@ -10,7 +10,7 @@ export const RunResultCard = ({ result }) => {
     <div className="card run-result-card">
       <div className="card-header">
         <span className="card-title">
-          <ShieldCheck size={16} style={{ color: isPassed ? 'var(--accent-green)' : 'var(--accent-red)' }} />
+          <ShieldCheck size={16} style={{ color: isPassed ? 'var(--alert-success-border)' : 'var(--alert-critical-border)' }} />
           Simulation Run Result Engine Execution
         </span>
         <span className={`badge ${isPassed ? 'badge-green' : 'badge-red'} mono`}>
@@ -41,9 +41,9 @@ export const RunResultCard = ({ result }) => {
           <div key={idx} className="rule-item">
             <div className="rule-status-icon">
               {rule.status === 'PASS' ? (
-                <CheckCircle2 size={16} className="text-green" />
+                <CheckCircle2 size={16} style={{ color: 'var(--alert-success-border)' }} />
               ) : (
-                <XCircle size={16} className="text-red" />
+                <XCircle size={16} style={{ color: 'var(--alert-critical-border)' }} />
               )}
             </div>
             <div className="rule-details">
@@ -59,16 +59,16 @@ export const RunResultCard = ({ result }) => {
 
       <style>{`
         .run-result-card {
-          border-left: 4px solid ${isPassed ? 'var(--accent-green)' : 'var(--accent-red)'};
+          border-left: 4px solid ${isPassed ? 'var(--alert-success-border)' : 'var(--alert-critical-border)'};
         }
 
         .result-summary-bar {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 1rem;
-          background-color: var(--bg-dark);
+          background-color: var(--color-soft-blush);
           padding: 0.8rem 1rem;
-          border-radius: 6px;
+          border-radius: 8px;
           border: 1px solid var(--border-color);
           margin-bottom: 1.2rem;
         }
@@ -90,13 +90,13 @@ export const RunResultCard = ({ result }) => {
           color: var(--text-primary);
         }
 
-        .text-green { color: var(--accent-green); }
-        .text-red { color: var(--accent-red); }
+        .text-green { color: var(--alert-success-text); }
+        .text-red { color: var(--alert-critical-text); }
 
         .rules-heading {
           font-size: 0.85rem;
           font-weight: 700;
-          color: var(--text-secondary);
+          color: var(--text-primary);
           text-transform: uppercase;
           letter-spacing: 0.05em;
           margin-bottom: 0.6rem;
@@ -112,9 +112,9 @@ export const RunResultCard = ({ result }) => {
           display: flex;
           align-items: center;
           gap: 0.75rem;
-          background-color: var(--bg-dark);
-          padding: 0.6rem 0.8rem;
-          border-radius: 6px;
+          background-color: #FFF9FA;
+          padding: 0.65rem 0.9rem;
+          border-radius: 8px;
           border: 1px solid var(--border-color);
         }
 
@@ -132,7 +132,7 @@ export const RunResultCard = ({ result }) => {
 
         .rule-info {
           font-size: 0.73rem;
-          color: var(--text-secondary);
+          color: var(--text-muted);
         }
       `}</style>
     </div>

@@ -23,19 +23,19 @@ export const PageContainer = ({ title, subtitle, actions, children }) => {
           align-items: flex-end;
           margin-bottom: 1.5rem;
           padding-bottom: 0.75rem;
-          border-bottom: 1px solid var(--border-color);
+          border-bottom: 1px solid rgba(255, 202, 212, 0.2);
         }
 
         .page-title {
           font-size: 1.5rem;
           font-weight: 700;
           letter-spacing: -0.01em;
-          color: var(--text-primary);
+          color: var(--text-inverse);
         }
 
         .page-subtitle {
           font-size: 0.85rem;
-          color: var(--text-secondary);
+          color: var(--color-soft-blush);
           margin-top: 0.2rem;
         }
 

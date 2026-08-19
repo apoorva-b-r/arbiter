@@ -114,17 +114,19 @@ export const Validation = () => {
           justify-content: center;
           text-align: center;
           padding: 2rem;
+          background-color: #FFF9FA;
+          border-radius: 16px;
         }
 
         .spin-text {
-          color: var(--accent-blue);
+          color: var(--color-berry-rose);
           font-weight: 700;
         }
 
         .placeholder-title {
           font-size: 1.05rem;
           font-weight: 700;
-          color: var(--text-secondary);
+          color: var(--text-primary);
           margin-top: 0.8rem;
         }
 

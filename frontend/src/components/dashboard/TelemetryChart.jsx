@@ -22,10 +22,10 @@ export const TelemetryChart = () => {
       return (
         <div className="custom-chart-tooltip mono">
           <p className="tooltip-time">{label}</p>
-          <p className="tooltip-item" style={{ color: 'var(--accent-green)' }}>
+          <p className="tooltip-item" style={{ color: 'var(--color-raspberry)' }}>
             Battery: {payload[0]?.value}%
           </p>
-          <p className="tooltip-item" style={{ color: 'var(--accent-blue)' }}>
+          <p className="tooltip-item" style={{ color: 'var(--color-rose-pink)' }}>
             Link Quality: {payload[1]?.value}%
           </p>
         </div>
@@ -38,22 +38,22 @@ export const TelemetryChart = () => {
     <div className="card chart-panel">
       <div className="card-header">
         <span className="card-title">
-          <Activity size={16} style={{ color: 'var(--accent-blue)' }} />
+          <Activity size={16} style={{ color: 'var(--color-rose-pink)' }} />
           Live Telemetry Trend (Battery vs Link Quality)
         </span>
-        <span className="badge badge-green mono">REALTIME STREAM</span>
+        <span className="badge badge-rose mono">REALTIME STREAM</span>
       </div>
 
       <div className="telemetry-summary">
-        <div className="telemetry-stat telemetry-stat-green">
+        <div className="telemetry-stat telemetry-stat-raspberry">
           <span className="telemetry-stat-label">BATTERY</span>
           <strong className="mono">{latest.battery ?? '--'}%</strong>
         </div>
-        <div className="telemetry-stat telemetry-stat-blue">
+        <div className="telemetry-stat telemetry-stat-rose">
           <span className="telemetry-stat-label">LINK QUALITY</span>
           <strong className="mono">{latest.linkQuality ?? '--'}%</strong>
         </div>
-        <div className="telemetry-stat telemetry-stat-neutral">
+        <div className="telemetry-stat telemetry-stat-berry">
           <span className="telemetry-stat-label">SIGNAL GAP</span>
           <strong className="mono">{latest.battery != null && latest.linkQuality != null ? Math.round(Math.abs(latest.battery - latest.linkQuality)) : '--'}%</strong>
         </div>
@@ -64,24 +64,24 @@ export const TelemetryChart = () => {
           <AreaChart data={telemetryHistory} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="battery-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--accent-green)" stopOpacity={0.32} />
-                <stop offset="100%" stopColor="var(--accent-green)" stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--color-raspberry)" stopOpacity={0.25} />
+                <stop offset="100%" stopColor="var(--color-raspberry)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="link-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--accent-blue)" stopOpacity={0.28} />
-                <stop offset="100%" stopColor="var(--accent-blue)" stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--color-rose-pink)" stopOpacity={0.25} />
+                <stop offset="100%" stopColor="var(--color-rose-pink)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#F1D3DA" vertical={false} />
             <XAxis
               dataKey="time"
-              stroke="#6b7280"
+              stroke="#8A6B75"
               tick={{ fontSize: 11, fontFamily: 'JetBrains Mono' }}
               tickLine={false}
             />
             <YAxis
               domain={[0, 100]}
-              stroke="#6b7280"
+              stroke="#8A6B75"
               tick={{ fontSize: 11, fontFamily: 'JetBrains Mono' }}
               tickLine={false}
             />
@@ -93,28 +93,28 @@ export const TelemetryChart = () => {
               type="monotone"
               dataKey="battery"
               name="Battery Level (%)"
-              stroke="var(--accent-green)"
+              stroke="var(--color-raspberry)"
               strokeWidth={2.5}
               fill="url(#battery-fill)"
-              activeDot={{ r: 5, fill: 'var(--accent-green)' }}
+              activeDot={{ r: 5, fill: 'var(--color-raspberry)' }}
             />
             <Area
               type="monotone"
               dataKey="linkQuality"
               name="Link Quality (%)"
-              stroke="var(--accent-blue)"
+              stroke="var(--color-rose-pink)"
               strokeWidth={2.5}
               fill="url(#link-fill)"
-              activeDot={{ r: 5, fill: 'var(--accent-blue)' }}
+              activeDot={{ r: 5, fill: 'var(--color-rose-pink)' }}
             />
-            <ReferenceLine y={50} stroke="var(--border-highlight)" strokeDasharray="4 4" />
+            <ReferenceLine y={50} stroke="var(--border-color)" strokeDasharray="4 4" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
       <style>{`
         .chart-panel {
-          --card-glow: var(--accent-blue);
+          --card-glow: var(--color-rose-pink);
           grid-column: 1 / -1;
         }
 
@@ -134,16 +134,16 @@ export const TelemetryChart = () => {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 0.55rem 0.7rem;
-          background: var(--bg-dark);
-          border-left: 2px solid var(--stat-color);
-          border-radius: 4px;
+          padding: 0.6rem 0.8rem;
+          background: var(--color-soft-blush);
+          border-left: 3px solid var(--stat-color);
+          border-radius: 8px;
         }
 
-        .telemetry-stat-green { --stat-color: var(--accent-green); }
-        .telemetry-stat-blue { --stat-color: var(--accent-blue); }
-        .telemetry-stat-neutral { --stat-color: var(--text-muted); }
-        .telemetry-stat-label { color: var(--text-muted); font-size: 0.68rem; letter-spacing: 0.08em; }
+        .telemetry-stat-raspberry { --stat-color: var(--color-raspberry); }
+        .telemetry-stat-rose { --stat-color: var(--color-rose-pink); }
+        .telemetry-stat-berry { --stat-color: var(--color-berry-rose); }
+        .telemetry-stat-label { color: var(--text-muted); font-size: 0.68rem; letter-spacing: 0.08em; font-weight: 700; }
         .telemetry-stat strong { color: var(--stat-color); font-size: 1rem; }
 
         @media (max-width: 640px) {
@@ -151,11 +151,11 @@ export const TelemetryChart = () => {
         }
 
         .custom-chart-tooltip {
-          background-color: var(--bg-dark);
+          background-color: var(--bg-card);
           border: 1px solid var(--border-color);
           padding: 0.6rem 0.8rem;
-          border-radius: 6px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+          border-radius: 10px;
+          box-shadow: 0 4px 16px rgba(96, 36, 55, 0.12);
           font-size: 0.78rem;
         }
 

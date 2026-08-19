@@ -46,7 +46,7 @@ export const StatusCards = () => {
       <div className="card status-card status-card-red">
         <div className="status-card-header">
           <span className="card-label">RF LINK QUALITY</span>
-          <div className="icon-badge" style={{ color: 'var(--accent-red)' }}>
+          <div className="icon-badge" style={{ color: 'var(--color-raspberry)' }}>
             <Signal size={20} />
           </div>
         </div>
@@ -60,13 +60,13 @@ export const StatusCards = () => {
               className="progress-bar-fill"
               style={{
                 width: `${telemetry.linkQuality}%`,
-                backgroundColor: 'var(--accent-red)'
+                backgroundColor: 'var(--color-rose-pink)'
               }}
             />
           </div>
         </div>
         <div className="status-card-footer">
-          <span className="badge badge-red">UHF 437.500 MHz</span>
+          <span className="badge badge-rose">UHF 437.500 MHz</span>
           <span className="mono text-muted text-xs">-92 dBm RSSI</span>
         </div>
       </div>
@@ -75,7 +75,7 @@ export const StatusCards = () => {
       <div className="card status-card status-card-purple">
         <div className="status-card-header">
           <span className="card-label">ACTIVE TRANSMISSION MODE</span>
-          <div className="icon-badge" style={{ color: 'var(--accent-purple)' }}>
+          <div className="icon-badge" style={{ color: 'var(--color-berry-rose)' }}>
             <Radio size={20} />
           </div>
         </div>
@@ -104,16 +104,16 @@ export const StatusCards = () => {
         }
 
         .status-card {
-          --card-glow: var(--accent-blue);
+          --card-glow: var(--color-rose-pink);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           height: 100%;
         }
 
-        .status-card-green { --card-glow: var(--accent-green); }
-        .status-card-red { --card-glow: var(--accent-red); }
-        .status-card-purple { --card-glow: var(--accent-purple); }
+        .status-card-green { --card-glow: var(--alert-success-border); }
+        .status-card-red { --card-glow: var(--color-raspberry); }
+        .status-card-purple { --card-glow: var(--color-berry-rose); }
 
         .status-card-header {
           display: flex;
@@ -130,9 +130,9 @@ export const StatusCards = () => {
         }
 
         .icon-badge {
-          background-color: var(--bg-dark);
-          padding: 0.4rem;
-          border-radius: 6px;
+          background-color: var(--color-soft-blush);
+          padding: 0.45rem;
+          border-radius: 8px;
           border: 1px solid var(--border-color);
           display: flex;
         }
@@ -151,30 +151,30 @@ export const StatusCards = () => {
         .status-val {
           font-size: 2rem;
           font-weight: 800;
-          color: var(--text-primary);
+          color: var(--color-berry-rose);
           line-height: 1;
         }
 
         .mode-text {
-          color: var(--accent-purple);
+          color: var(--color-berry-rose);
         }
 
         .status-subtext {
           font-size: 0.8rem;
-          color: var(--text-secondary);
+          color: var(--text-muted);
         }
 
         .progress-bar-container {
-          height: 6px;
-          background-color: var(--bg-dark);
-          border-radius: 3px;
+          height: 8px;
+          background-color: var(--color-soft-blush);
+          border-radius: 4px;
           overflow: hidden;
           border: 1px solid var(--border-color);
         }
 
         .progress-bar-fill {
           height: 100%;
-          border-radius: 3px;
+          border-radius: 4px;
           transition: width 0.4s ease, background-color 0.4s ease;
         }
 

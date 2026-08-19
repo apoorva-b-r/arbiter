@@ -50,7 +50,7 @@ export const Dashboard = () => {
 
         .dashboard-grid > .card,
         .queue-decision-row > .card {
-          --card-glow: var(--accent-blue);
+          --card-glow: var(--color-rose-pink);
         }
 
         .dashboard-grid .card {
@@ -58,8 +58,8 @@ export const Dashboard = () => {
         }
 
         .dashboard-grid .card:hover {
-          border-color: var(--card-glow);
-          box-shadow: 0 0 0 1px var(--card-glow), 0 0 22px color-mix(in srgb, var(--card-glow) 28%, transparent), var(--shadow-md);
+          border-color: var(--color-rose-pink);
+          box-shadow: 0 6px 20px rgba(96, 36, 55, 0.12), 0 0 15px rgba(224, 87, 128, 0.2);
           transform: translateY(-2px);
         }
       `}</style>

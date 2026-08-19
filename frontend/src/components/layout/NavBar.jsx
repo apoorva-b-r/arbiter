@@ -74,8 +74,6 @@ export const NavBar = () => {
 
         {/* User Operator Info */}
         <div className="operator-badge">
-          <User size={14} />
-          <span>{user.username}</span>
           <button onClick={handleLogout} className="logout-btn" title="Logout session">
             <LogOut size={14} />
           </button>
@@ -84,16 +82,16 @@ export const NavBar = () => {
 
       <style>{`
         .navbar-container {
-          background-color: var(--bg-card);
-          border-bottom: 1px solid var(--border-color);
-          padding: 0.75rem 2rem;
+          background-color: var(--color-deep-plum);
+          border-bottom: 1px solid rgba(255, 202, 212, 0.2);
+          padding: 0.85rem 2rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
           position: sticky;
           top: 0;
           z-index: 100;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+          box-shadow: 0 4px 16px rgba(43, 15, 24, 0.4);
         }
 
         .navbar-brand {
@@ -103,21 +101,22 @@ export const NavBar = () => {
         }
 
         .satellite-icon-box {
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
-          border: 1px solid rgba(59, 130, 246, 0.4);
-          padding: 0.45rem;
-          border-radius: 6px;
-          color: var(--accent-blue);
+          background: linear-gradient(135deg, var(--color-berry-rose), var(--color-raspberry));
+          border: 1px solid var(--color-rose-pink);
+          padding: 0.5rem;
+          border-radius: 10px;
+          color: var(--text-inverse);
           display: flex;
           align-items: center;
           justify-content: center;
+          box-shadow: 0 2px 8px rgba(138, 40, 70, 0.3);
         }
 
         .brand-title {
-          font-size: 1.1rem;
+          font-size: 1.15rem;
           font-weight: 800;
-          letter-spacing: 0.1em;
-          color: var(--text-primary);
+          letter-spacing: 0.12em;
+          color: var(--text-inverse);
           line-height: 1.1;
         }
 
@@ -125,42 +124,43 @@ export const NavBar = () => {
           font-size: 0.65rem;
           font-weight: 600;
           letter-spacing: 0.08em;
-          color: var(--text-muted);
+          color: var(--color-soft-blush);
           display: block;
         }
 
         .navbar-links {
           display: flex;
           gap: 0.4rem;
-          background-color: var(--bg-dark);
-          padding: 0.25rem;
-          border-radius: 8px;
-          border: 1px solid var(--border-color);
+          background-color: rgba(43, 15, 24, 0.4);
+          padding: 0.3rem;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 202, 212, 0.2);
         }
 
         .nav-item {
           display: flex;
           align-items: center;
           gap: 0.45rem;
-          padding: 0.45rem 0.9rem;
-          border-radius: 6px;
-          color: var(--text-secondary);
+          padding: 0.45rem 1rem;
+          border-radius: 999px;
+          color: var(--color-soft-blush);
           text-decoration: none;
           font-size: 0.85rem;
           font-weight: 500;
-          transition: all 0.15s ease;
+          transition: all 0.2s ease;
         }
 
         .nav-item:hover {
-          color: var(--text-primary);
-          background-color: var(--bg-card-hover);
+          color: var(--text-inverse);
+          background-color: rgba(255, 255, 255, 0.12);
         }
 
         .nav-item.active {
-          color: var(--accent-blue);
-          background-color: var(--accent-blue-bg);
-          border: 1px solid rgba(59, 130, 246, 0.3);
+          color: var(--text-inverse);
+          background-color: var(--color-berry-rose);
+          border: 1px solid var(--color-rose-pink);
           font-weight: 600;
+          box-shadow: 0 2px 8px rgba(138, 40, 70, 0.3);
         }
 
         .navbar-status {
@@ -173,51 +173,55 @@ export const NavBar = () => {
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          background-color: rgba(16, 185, 129, 0.08);
-          border: 1px solid rgba(16, 185, 129, 0.25);
+          background-color: var(--alert-success-bg);
+          border: 1px solid var(--alert-success-border);
           padding: 0.35rem 0.75rem;
-          border-radius: 6px;
+          border-radius: 999px;
           font-size: 0.78rem;
-          color: var(--accent-green);
+          color: var(--alert-success-text);
+          font-weight: 600;
         }
 
         .utc-clock {
           display: flex;
           align-items: center;
           gap: 0.4rem;
-          background-color: var(--bg-dark);
-          border: 1px solid var(--border-color);
-          padding: 0.35rem 0.75rem;
-          border-radius: 6px;
+          background-color: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 202, 212, 0.2);
+          padding: 0.4rem 0.8rem;
+          border-radius: 999px;
           font-size: 0.8rem;
-          color: var(--text-secondary);
+          color: var(--text-inverse);
         }
 
         .operator-badge {
           display: flex;
           align-items: center;
           gap: 0.45rem;
-          background-color: var(--bg-dark);
-          border: 1px solid var(--border-color);
+          background-color: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 202, 212, 0.2);
           padding: 0.35rem 0.75rem;
-          border-radius: 6px;
+          border-radius: 999px;
           font-size: 0.8rem;
-          color: var(--text-primary);
+          color: var(--text-inverse);
         }
 
         .logout-btn {
-          background: none;
+          background: var(--color-soft-blush);
           border: none;
-          color: var(--text-muted);
+          color: var(--color-berry-rose);
           cursor: pointer;
-          margin-left: 0.25rem;
+          padding: 0.3rem 0.5rem;
+          border-radius: 999px;
           display: flex;
           align-items: center;
-          transition: color 0.15s;
+          justify-content: center;
+          transition: all 0.2s;
         }
 
         .logout-btn:hover {
-          color: var(--accent-red);
+          background-color: var(--color-rose-pink);
+          color: var(--text-inverse);
         }
       `}</style>
     </header>

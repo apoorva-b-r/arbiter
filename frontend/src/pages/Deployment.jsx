@@ -51,11 +51,11 @@ export const Deployment = () => {
               <div key={idx} className="timeline-item">
                 <div className="timeline-marker">
                   {log.type === 'warning' ? (
-                    <ShieldAlert size={16} style={{ color: 'var(--accent-amber)' }} />
+                    <ShieldAlert size={16} style={{ color: 'var(--alert-warning-border)' }} />
                   ) : log.type === 'success' ? (
-                    <CheckCircle2 size={16} style={{ color: 'var(--accent-green)' }} />
+                    <CheckCircle2 size={16} style={{ color: 'var(--alert-success-border)' }} />
                   ) : (
-                    <Clock size={16} style={{ color: 'var(--accent-blue)' }} />
+                    <Clock size={16} style={{ color: 'var(--color-berry-rose)' }} />
                   )}
                 </div>
                 <div className="timeline-body">
@@ -97,19 +97,22 @@ export const Deployment = () => {
         }
 
         .timeline-marker {
-          background-color: var(--bg-dark);
-          padding: 0.2rem;
+          background-color: var(--color-soft-blush);
+          padding: 0.3rem;
           border-radius: 50%;
           border: 1px solid var(--border-color);
           margin-top: 0.1rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .timeline-body {
           flex: 1;
-          background-color: var(--bg-dark);
+          background-color: #FFF9FA;
           border: 1px solid var(--border-color);
-          padding: 0.6rem 0.9rem;
-          border-radius: 6px;
+          padding: 0.75rem 1rem;
+          border-radius: 12px;
         }
 
         .timeline-meta {

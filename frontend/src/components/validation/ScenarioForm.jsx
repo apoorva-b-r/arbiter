@@ -25,7 +25,7 @@ export const ScenarioForm = ({ onSubmit, onClose }) => {
     <div className="card scenario-form-card">
       <div className="card-header">
         <span className="card-title">
-          <PlusCircle size={16} style={{ color: 'var(--accent-blue)' }} />
+          <PlusCircle size={16} style={{ color: 'var(--color-rose-pink)' }} />
           Create New Safety Scenario
         </span>
         {onClose && (
@@ -107,12 +107,12 @@ export const ScenarioForm = ({ onSubmit, onClose }) => {
         .close-btn {
           background: none;
           border: none;
-          color: var(--text-muted);
+          color: var(--color-soft-blush);
           cursor: pointer;
         }
 
         .close-btn:hover {
-          color: var(--text-primary);
+          color: var(--text-inverse);
         }
 
         .form-row {

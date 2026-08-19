@@ -34,19 +34,19 @@ export const ContingencyBanner = ({ message, onResolve }) => {
 
       <style>{`
         .contingency-banner-card {
-          background-color: rgba(245, 158, 11, 0.12);
-          border: 2px solid var(--accent-amber);
-          border-radius: 8px;
+          background-color: var(--alert-warning-bg);
+          border: 2px solid var(--alert-warning-border);
+          border-radius: 12px;
           padding: 1.2rem 1.5rem;
           margin-bottom: 1.5rem;
-          box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+          box-shadow: 0 4px 16px rgba(217, 119, 6, 0.2);
           animation: pulse-border 2s infinite;
         }
 
         @keyframes pulse-border {
-          0% { border-color: rgba(245, 158, 11, 0.6); }
-          50% { border-color: rgba(245, 158, 11, 1); }
-          100% { border-color: rgba(245, 158, 11, 0.6); }
+          0% { border-color: rgba(217, 119, 6, 0.6); }
+          50% { border-color: var(--alert-warning-border); }
+          100% { border-color: rgba(217, 119, 6, 0.6); }
         }
 
         .banner-content {
@@ -57,10 +57,10 @@ export const ContingencyBanner = ({ message, onResolve }) => {
         }
 
         .alert-icon-box {
-          background-color: var(--accent-amber);
-          color: #000;
+          background-color: var(--alert-warning-border);
+          color: #fff;
           padding: 0.6rem;
-          border-radius: 8px;
+          border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -72,20 +72,21 @@ export const ContingencyBanner = ({ message, onResolve }) => {
           gap: 0.75rem;
           font-weight: 800;
           font-size: 0.95rem;
-          color: var(--accent-amber);
+          color: var(--alert-warning-text);
           margin-bottom: 0.2rem;
         }
 
         .banner-msg {
           font-size: 0.85rem;
-          color: var(--text-primary);
+          color: var(--alert-warning-text);
+          font-weight: 600;
         }
 
         .banner-actions {
           display: flex;
           gap: 0.75rem;
           justify-content: flex-end;
-          border-top: 1px solid rgba(245, 158, 11, 0.3);
+          border-top: 1px solid rgba(217, 119, 6, 0.3);
           padding-top: 0.8rem;
           flex-wrap: wrap;
         }

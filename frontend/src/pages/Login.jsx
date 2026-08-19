@@ -82,7 +82,7 @@ export const Login = () => {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: radial-gradient(circle at 50% 30%, rgba(59, 130, 246, 0.08), transparent 70%), var(--bg-dark);
+          background: radial-gradient(circle at 50% 30%, rgba(224, 87, 128, 0.12), transparent 70%), var(--color-deep-plum);
           padding: 1.5rem;
         }
 
@@ -90,8 +90,11 @@ export const Login = () => {
           width: 100%;
           max-width: 440px;
           border: 1px solid var(--border-color);
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-          padding: 2rem;
+          border-left: 4px solid var(--color-berry-rose);
+          border-radius: 16px;
+          box-shadow: 0 12px 36px rgba(43, 15, 24, 0.3);
+          padding: 2.25rem 2rem;
+          background-color: var(--bg-card);
         }
 
         .login-header {
@@ -101,19 +104,20 @@ export const Login = () => {
 
         .logo-box {
           display: inline-flex;
-          padding: 0.8rem;
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
-          border: 1px solid rgba(59, 130, 246, 0.4);
-          border-radius: 12px;
-          color: var(--accent-blue);
+          padding: 0.85rem;
+          background: linear-gradient(135deg, var(--color-berry-rose), var(--color-raspberry));
+          border: 1px solid var(--color-rose-pink);
+          border-radius: 14px;
+          color: var(--text-inverse);
           margin-bottom: 0.8rem;
+          box-shadow: 0 4px 12px rgba(138, 40, 70, 0.3);
         }
 
         .login-title {
-          font-size: 1.5rem;
+          font-size: 1.6rem;
           font-weight: 800;
-          letter-spacing: 0.1em;
-          color: var(--text-primary);
+          letter-spacing: 0.12em;
+          color: var(--color-berry-rose);
         }
 
         .login-subtitle {
@@ -144,6 +148,7 @@ export const Login = () => {
           margin-top: 0.5rem;
           padding: 0.75rem;
           font-size: 0.95rem;
+          border-radius: 12px;
         }
 
         .login-footer {

@@ -67,16 +67,17 @@ export const DecisionLog = () => {
         }
 
         .decision-card {
-          background-color: var(--bg-dark);
+          background-color: #FFF9FA;
           border: 1px solid var(--border-color);
-          border-left: 4px solid var(--accent-purple);
+          border-left: 4px solid var(--color-rose-pink);
           padding: 0.8rem 1rem;
-          border-radius: 6px;
+          border-radius: 12px;
         }
 
         .decision-card.override-card {
-          border-left-color: var(--accent-red);
-          background-color: rgba(239, 68, 68, 0.04);
+          border-left-color: var(--alert-critical-border);
+          background-color: var(--alert-critical-bg);
+          color: var(--alert-critical-text);
         }
 
         .decision-header {
@@ -95,7 +96,7 @@ export const DecisionLog = () => {
         .decision-type-badge {
           font-weight: 700;
           font-size: 0.82rem;
-          color: var(--text-primary);
+          color: var(--color-berry-rose);
         }
 
         .decision-time {
@@ -105,7 +106,7 @@ export const DecisionLog = () => {
 
         .decision-reasoning {
           font-size: 0.84rem;
-          color: var(--text-secondary);
+          color: var(--text-primary);
           line-height: 1.4;
           margin-bottom: 0.5rem;
         }
@@ -115,7 +116,7 @@ export const DecisionLog = () => {
           gap: 1rem;
           font-size: 0.7rem;
           color: var(--text-muted);
-          border-top: 1px solid rgba(255, 255, 255, 0.04);
+          border-top: 1px solid var(--border-color);
           padding-top: 0.35rem;
         }
       `}</style>

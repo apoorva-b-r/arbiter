@@ -39,7 +39,7 @@ export const Settings = () => {
         <div className="card">
           <div className="card-header">
             <span className="card-title">
-              <Sliders size={16} style={{ color: 'var(--accent-blue)' }} />
+              <Sliders size={16} style={{ color: 'var(--color-rose-pink)' }} />
               Base Priority Weight Configuration Sliders
             </span>
             <span className="badge badge-blue mono">ROUTER ALGORITHM</span>
@@ -190,12 +190,12 @@ export const Settings = () => {
         .slider-val {
           font-weight: 800;
           font-size: 1.1rem;
-          color: var(--accent-blue);
+          color: var(--color-berry-rose);
         }
 
         .slider-input {
           width: 100%;
-          accent-color: var(--accent-blue);
+          accent-color: var(--color-berry-rose);
           cursor: pointer;
         }
 
@@ -210,15 +210,16 @@ export const Settings = () => {
 
         .save-ack-banner {
           margin-top: 1rem;
-          background-color: var(--accent-green-bg);
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          color: var(--accent-green);
+          background-color: var(--alert-success-bg);
+          border: 1px solid var(--alert-success-border);
+          color: var(--alert-success-text);
           padding: 0.6rem 0.9rem;
-          border-radius: 6px;
+          border-radius: 8px;
           font-size: 0.8rem;
           display: flex;
           align-items: center;
           gap: 0.5rem;
+          font-weight: 600;
         }
       `}</style>
     </PageContainer>

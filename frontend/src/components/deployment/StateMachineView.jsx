@@ -101,41 +101,41 @@ export const StateMachineView = ({
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          background-color: var(--bg-dark);
+          background-color: #FFF9FA;
           border: 1px solid var(--border-color);
           padding: 0.7rem 0.9rem;
-          border-radius: 8px;
+          border-radius: 12px;
           cursor: pointer;
           transition: all 0.2s ease;
           min-width: 170px;
         }
 
         .pipeline-node:hover {
-          border-color: var(--accent-blue);
+          border-color: var(--color-berry-rose);
           transform: translateY(-2px);
         }
 
         .pipeline-node.node-done {
-          border-color: rgba(16, 185, 129, 0.4);
-          background-color: rgba(16, 185, 129, 0.05);
+          border-color: var(--alert-success-border);
+          background-color: var(--alert-success-bg);
         }
 
         .pipeline-node.node-current {
-          border-color: var(--accent-blue);
-          background-color: rgba(59, 130, 246, 0.1);
-          box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+          border-color: var(--color-berry-rose);
+          background-color: var(--color-soft-blush);
+          box-shadow: 0 4px 12px rgba(138, 40, 70, 0.15);
         }
 
         .pipeline-node.node-contingency {
-          border-color: var(--accent-amber);
-          background-color: rgba(245, 158, 11, 0.12);
-          box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+          border-color: var(--alert-warning-border);
+          background-color: var(--alert-warning-bg);
+          box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
           animation: pulse-amber 1.5s infinite;
         }
 
         .node-step {
           font-size: 0.65rem;
-          color: var(--text-muted);
+          color: var(--color-berry-rose);
           display: block;
           font-weight: 700;
         }
@@ -155,12 +155,13 @@ export const StateMachineView = ({
         }
 
         .pipeline-connector.connector-done {
-          background-color: var(--accent-green);
+          background-color: var(--alert-success-border);
         }
 
         .current-state-details {
-          background-color: var(--bg-dark);
+          background-color: #FFF9FA;
           margin-top: 1rem;
+          border-radius: 12px;
         }
 
         .details-header {
@@ -172,7 +173,7 @@ export const StateMachineView = ({
 
         .state-timestamp {
           font-size: 0.78rem;
-          color: var(--text-secondary);
+          color: var(--color-berry-rose);
         }
 
         .state-name-display {
@@ -184,7 +185,7 @@ export const StateMachineView = ({
 
         .state-desc-display {
           font-size: 0.85rem;
-          color: var(--text-secondary);
+          color: var(--text-muted);
         }
       `}</style>
     </div>

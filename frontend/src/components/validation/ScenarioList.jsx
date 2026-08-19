@@ -64,16 +64,16 @@ export const ScenarioList = ({ scenarios, onRunScenario, selectedScenarioId }) =
         }
 
         .scenario-card {
-          background-color: var(--bg-dark);
+          background-color: #FFF9FA;
           border: 1px solid var(--border-color);
-          border-radius: 6px;
-          padding: 0.9rem 1rem;
-          transition: border-color 0.15s ease;
+          border-radius: 12px;
+          padding: 0.95rem 1.1rem;
+          transition: all 0.2s ease;
         }
 
         .scenario-card.active-scen {
-          border-color: var(--accent-blue);
-          box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+          border-color: var(--color-berry-rose);
+          box-shadow: 0 4px 14px rgba(138, 40, 70, 0.15);
         }
 
         .scen-top {
@@ -85,7 +85,7 @@ export const ScenarioList = ({ scenarios, onRunScenario, selectedScenarioId }) =
 
         .scen-id {
           font-size: 0.7rem;
-          color: var(--accent-blue);
+          color: var(--color-berry-rose);
           font-weight: 700;
         }
 
@@ -97,7 +97,7 @@ export const ScenarioList = ({ scenarios, onRunScenario, selectedScenarioId }) =
 
         .scen-desc {
           font-size: 0.82rem;
-          color: var(--text-secondary);
+          color: var(--text-muted);
           line-height: 1.4;
           margin-bottom: 0.6rem;
         }

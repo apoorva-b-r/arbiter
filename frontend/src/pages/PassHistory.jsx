@@ -16,7 +16,7 @@ export const PassHistory = () => {
       title="GROUND PASS HISTORY LOGS"
       subtitle="Historical log of orbital ground passes, transmission telemetry metrics, and operator overrides"
     >
-      <div className="card">
+      <div className="card pass-history-card">
         <div className="card-header">
           <span className="card-title">
             <History size={16} style={{ color: 'var(--accent-blue)' }} />
@@ -89,7 +89,7 @@ export const PassHistory = () => {
                 Pass Decision Log Breakdown — {selectedPass.passId}
               </span>
               <button onClick={() => setSelectedPass(null)} className="close-btn">
-                <X size={18} />
+                <X size={17} />
               </button>
             </div>
 
@@ -133,8 +133,38 @@ export const PassHistory = () => {
       )}
 
       <style>{`
-        .bold { font-weight: 700; color: var(--accent-blue); }
+        .bold { font-weight: 700; color: var(--color-berry-rose); }
         .cell-with-sub { display: flex; flex-direction: column; }
+
+        .close-btn {
+          background: none;
+          border: none;
+          color: var(--color-soft-blush);
+          cursor: pointer;
+        }
+
+        .close-btn:hover {
+          color: var(--text-inverse);
+        }
+
+        .pass-history-card {
+          --card-glow: var(--color-rose-pink);
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        .pass-history-card:hover {
+          border-color: var(--color-rose-pink);
+          box-shadow: 0 6px 20px rgba(96, 36, 55, 0.12);
+        }
+
+        .pass-history-card .tech-table tbody tr {
+          transition: background-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .pass-history-card .tech-table tbody tr:hover {
+          background-color: #FFF0F3;
+          box-shadow: inset 3px 0 0 var(--color-berry-rose);
+        }
         
         .modal-backdrop {
           position: fixed;
@@ -142,7 +172,7 @@ export const PassHistory = () => {
           left: 0;
           right: 0;
           bottom: 0;
-          background-color: rgba(0, 0, 0, 0.75);
+          background-color: rgba(43, 15, 24, 0.75);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -156,23 +186,43 @@ export const PassHistory = () => {
           max-height: 85vh;
           display: flex;
           flex-direction: column;
+          border-color: var(--color-berry-rose);
+          box-shadow: 0 12px 36px rgba(96, 36, 55, 0.3);
+          border-radius: 16px;
         }
 
         .pass-summary-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 0.75rem;
-          background-color: var(--bg-dark);
+          background-color: var(--color-soft-blush);
           padding: 0.8rem 1rem;
-          border-radius: 6px;
+          border-radius: 8px;
           border: 1px solid var(--border-color);
           margin-bottom: 1rem;
+        }
+
+        .pass-metric {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .metric-label {
+          font-size: 0.68rem;
+          color: var(--text-muted);
+          font-weight: 700;
+        }
+
+        .metric-val {
+          font-size: 1rem;
+          font-weight: 800;
+          color: var(--color-berry-rose);
         }
 
         .modal-section-title {
           font-size: 0.82rem;
           font-weight: 700;
-          color: var(--text-secondary);
+          color: var(--text-primary);
           text-transform: uppercase;
           letter-spacing: 0.05em;
           margin-bottom: 0.5rem;

@@ -21,7 +21,7 @@ export const OverridePanel = () => {
     <div className="card override-panel">
       <div className="card-header">
         <span className="card-title">
-          <ShieldAlert size={16} style={{ color: 'var(--accent-red)' }} />
+          <ShieldAlert size={16} style={{ color: 'var(--alert-warning-border)' }} />
           Manual Operator Override Console
         </span>
         <span className="badge badge-amber mono">AI BYPASS</span>
@@ -91,7 +91,7 @@ export const OverridePanel = () => {
 
         .override-desc {
           font-size: 0.83rem;
-          color: var(--text-secondary);
+          color: var(--text-muted);
           margin-bottom: 1rem;
         }
 
@@ -102,11 +102,11 @@ export const OverridePanel = () => {
         }
 
         .override-btn {
-          --override-color: var(--accent-blue);
-          background-color: var(--bg-dark);
+          --override-color: var(--color-berry-rose);
+          background-color: #FFF9FA;
           border: 1px solid var(--border-color);
-          border-radius: 6px;
-          padding: 0.8rem 1rem;
+          border-radius: 12px;
+          padding: 0.85rem 1rem;
           text-align: left;
           cursor: pointer;
           transition: all 0.2s ease;
@@ -114,25 +114,27 @@ export const OverridePanel = () => {
         }
 
         .override-btn:hover {
-          border-color: var(--override-color);
-          box-shadow: 0 0 14px color-mix(in srgb, var(--override-color) 28%, transparent);
+          border-color: var(--color-berry-rose);
+          box-shadow: 0 4px 12px rgba(138, 40, 70, 0.15);
           transform: translateY(-1px);
         }
 
-        .btn-ttc { --override-color: var(--accent-red); }
-        .btn-sstv { --override-color: var(--accent-purple); }
-        .btn-codec2 { --override-color: var(--accent-blue); }
-        .btn-m17 { --override-color: var(--accent-green); }
-
-        .btn-ttc .btn-header { color: var(--accent-red); }
-        .btn-sstv .btn-header { color: var(--accent-purple); }
-        .btn-codec2 .btn-header { color: var(--accent-blue); }
-        .btn-m17 .btn-header { color: var(--accent-green); }
+        .btn-ttc .btn-header { color: var(--alert-critical-border); }
+        .btn-sstv .btn-header { color: var(--color-berry-rose); }
+        .btn-codec2 .btn-header { color: var(--color-rose-pink); }
+        .btn-m17 .btn-header { color: var(--color-raspberry); }
 
         .override-btn.active-mode {
-          border-color: var(--override-color);
-          background-color: color-mix(in srgb, var(--override-color) 10%, var(--bg-dark));
-          box-shadow: 0 0 10px color-mix(in srgb, var(--override-color) 24%, transparent);
+          border-color: var(--color-berry-rose);
+          background-color: var(--color-berry-rose);
+          color: var(--text-inverse);
+          box-shadow: 0 4px 14px rgba(138, 40, 70, 0.3);
+        }
+
+        .override-btn.active-mode .btn-header,
+        .override-btn.active-mode .btn-sub,
+        .override-btn.active-mode .mono {
+          color: var(--text-inverse) !important;
         }
 
         .btn-header {
@@ -146,21 +148,22 @@ export const OverridePanel = () => {
 
         .btn-sub {
           font-size: 0.75rem;
-          color: var(--text-secondary);
+          color: var(--text-muted);
           display: block;
         }
 
         .override-ack-banner {
           margin-top: 1rem;
-          background-color: var(--accent-green-bg);
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          color: var(--accent-green);
+          background-color: var(--alert-success-bg);
+          border: 1px solid var(--alert-success-border);
+          color: var(--alert-success-text);
           padding: 0.6rem 0.9rem;
-          border-radius: 6px;
+          border-radius: 8px;
           font-size: 0.8rem;
           display: flex;
           align-items: center;
           gap: 0.5rem;
+          font-weight: 600;
         }
       `}</style>
     </div>

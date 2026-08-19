@@ -73,35 +73,35 @@ export const QueuePanel = () => {
         }
 
         .queue-item {
-          --queue-glow: var(--accent-blue);
+          --queue-glow: var(--color-rose-pink);
           display: flex;
           align-items: center;
           gap: 0.8rem;
-          background-color: var(--bg-dark);
+          background-color: #FFF9FA;
           border: 1px solid var(--border-color);
           padding: 0.75rem 0.9rem;
-          border-radius: 6px;
-          transition: border-color 0.15s ease;
+          border-radius: 12px;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
         .queue-item:hover {
-          border-color: var(--queue-glow);
-          box-shadow: 0 0 14px color-mix(in srgb, var(--queue-glow) 26%, transparent);
+          border-color: var(--color-berry-rose);
+          box-shadow: 0 4px 12px rgba(138, 40, 70, 0.12);
         }
 
-        .queue-item-ttc { --queue-glow: var(--accent-red); }
-        .queue-item-sstv { --queue-glow: var(--accent-purple); }
-        .queue-item-codec2 { --queue-glow: var(--accent-blue); }
-        .queue-item-m17 { --queue-glow: var(--accent-green); }
+        .queue-item-ttc { --queue-glow: var(--alert-critical-border); }
+        .queue-item-sstv { --queue-glow: var(--color-berry-rose); }
+        .queue-item-codec2 { --queue-glow: var(--color-rose-pink); }
+        .queue-item-m17 { --queue-glow: var(--color-raspberry); }
 
         .queue-item.starved-item {
-          border-color: var(--accent-amber);
-          background-color: rgba(245, 158, 11, 0.05);
+          border-color: var(--alert-warning-border);
+          background-color: var(--alert-warning-bg);
         }
 
         .queue-rank {
           font-weight: 700;
-          color: var(--text-muted);
+          color: var(--color-berry-rose);
           font-size: 0.9rem;
           min-width: 26px;
         }
@@ -128,15 +128,15 @@ export const QueuePanel = () => {
           align-items: center;
           gap: 0.4rem;
           font-size: 0.75rem;
-          color: var(--text-secondary);
+          color: var(--text-muted);
         }
 
         .starved-tag {
           display: flex;
           align-items: center;
           gap: 0.2rem;
-          color: var(--accent-amber);
-          font-weight: 600;
+          color: var(--alert-warning-text);
+          font-weight: 700;
           font-size: 0.7rem;
         }
 
@@ -144,9 +144,9 @@ export const QueuePanel = () => {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          background-color: var(--bg-card);
+          background-color: var(--color-soft-blush);
           padding: 0.35rem 0.65rem;
-          border-radius: 4px;
+          border-radius: 8px;
           border: 1px solid var(--border-color);
         }
 
@@ -159,7 +159,7 @@ export const QueuePanel = () => {
         .score-val {
           font-size: 1.1rem;
           font-weight: 800;
-          color: var(--accent-purple);
+          color: var(--color-berry-rose);
         }
       `}</style>
     </div>
