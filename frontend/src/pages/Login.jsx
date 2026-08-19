@@ -6,13 +6,22 @@ import { Radio, Lock, User, ArrowRight, Shield } from 'lucide-react';
 export const Login = () => {
   const { login } = useTelemetry();
   const navigate = useNavigate();
-  const [username, setUsername] = useState('Operator-Alpha');
-  const [password, setPassword] = useState('arbiter2026');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    login(username, password);
-    navigate('/dashboard');
+
+    setError('');
+
+    const success = login(username, password);
+
+    if (success) {
+      navigate('/dashboard', { replace: true });
+    } else {
+      setError('Invalid Operator ID or Access Passcode.');
+    }
   };
 
   return (

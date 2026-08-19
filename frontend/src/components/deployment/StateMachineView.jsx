@@ -1,7 +1,12 @@
 import React from 'react';
-import { CheckCircle2, Circle, AlertCircle, PlayCircle, Clock } from 'lucide-react';
+import { CheckCircle2, Circle, AlertCircle, PlayCircle, Clock, Play, RotateCcw } from 'lucide-react';
 
-export const StateMachineView = ({ deploymentState, onSelectState, onSimulateContingency }) => {
+export const StateMachineView = ({
+  deploymentState,
+  onSelectState,
+  onStartSequence,
+  onSimulateContingency
+}) => {
   const { currentStateIndex, states, contingencyActive } = deploymentState;
 
   return (
@@ -9,6 +14,13 @@ export const StateMachineView = ({ deploymentState, onSelectState, onSimulateCon
       <div className="card-header">
         <span className="card-title">Deployment Handover Pipeline State Machine</span>
         <div className="pipeline-controls">
+          <button
+            onClick={onStartSequence}
+            className="btn btn-primary btn-sm"
+          >
+            <Play size={14} />
+            Run Launch Sequence Demo
+          </button>
           <button
             onClick={onSimulateContingency}
             className="btn btn-warning btn-sm"

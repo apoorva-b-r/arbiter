@@ -18,7 +18,7 @@ export const TelemetryProvider = ({ children }) => {
   // Auth state
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('arbiter_user');
-    return saved ? JSON.parse(saved) : { username: 'Operator-Alpha', token: 'mock-jwt-token-12345' };
+    return saved ? JSON.parse(saved) : null;
   });
 
   // Global Mission Data State
@@ -115,9 +115,24 @@ export const TelemetryProvider = ({ children }) => {
 
   // Auth methods
   const login = (username, password) => {
-    const userData = { username, token: `token-${Date.now()}` };
+    const validUsername = 'Operator-Alpha';
+    const validPassword = 'arbiter2026';
+
+    if (
+      username.trim() !== validUsername ||
+      password !== validPassword
+    ) {
+      return false;
+    }
+
+    const userData = {
+      username: validUsername,
+      token: `token-${Date.now()}`
+    };
+
     setUser(userData);
     localStorage.setItem('arbiter_user', JSON.stringify(userData));
+
     return true;
   };
 
@@ -175,6 +190,63 @@ export const TelemetryProvider = ({ children }) => {
   };
 
   // Deployment state machine actions
+  const [deploymentTimer, setDeploymentTimer] = useState(null);
+
+  const startDeploymentSequence = () => {
+    // Reset to Stowed
+    setDeployment(prev => ({
+      ...prev,
+      currentStateIndex: 0,
+      contingencyActive: false,
+      contingencyMessage: '',
+      timeElapsedSec: 0,
+      historyLogs: [
+        {
+          timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
+          event: '🚀 MISSION CONTROL INITIATED LAUNCH VEHOLDER DEPLOYMENT SEQUENCE',
+          state: 'STOWED',
+          type: 'info'
+        }
+      ]
+    }));
+
+    // Step 1 -> Release Triggered after 2 seconds
+    setTimeout(() => {
+      setDeployment(prev => ({
+        ...prev,
+        currentStateIndex: 1,
+        timeElapsedSec: 2,
+        historyLogs: [
+          ...prev.historyLogs,
+          {
+            timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
+            event: '⚡ POD DEPLOYER DOOR RELEASE SIGNAL FIRED (SPRING EJECTION ACTIVATED)',
+            state: 'RELEASE_TRIGGERED',
+            type: 'info'
+          }
+        ]
+      }));
+
+      // Step 2 -> Awaiting Separation Confirmation (start 15s timer)
+      setTimeout(() => {
+        setDeployment(prev => ({
+          ...prev,
+          currentStateIndex: 2,
+          timeElapsedSec: 5,
+          historyLogs: [
+            ...prev.historyLogs,
+            {
+              timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
+              event: '📡 AWAITING SEPARATION SWITCH CONFIRMATION & FIRST RF BEACON...',
+              state: 'SEPARATION_CONFIRMED',
+              type: 'info'
+            }
+          ]
+        }));
+      }, 3000);
+    }, 2000);
+  };
+
   const transitionDeploymentState = async (nextIndex) => {
     await api.transitionDeployment(nextIndex);
     setDeployment(prev => ({
@@ -187,7 +259,8 @@ export const TelemetryProvider = ({ children }) => {
         {
           timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
           event: `OPERATOR TRANSITIONED STATE TO: ${prev.states[nextIndex]?.label}`,
-          state: prev.states[nextIndex]?.id
+          state: prev.states[nextIndex]?.id,
+          type: 'info'
         }
       ]
     }));
@@ -197,13 +270,14 @@ export const TelemetryProvider = ({ children }) => {
     setDeployment(prev => ({
       ...prev,
       contingencyActive: true,
-      contingencyMessage: reason || 'DEPLOYMENT SIGNAL ACKNOWLEDGEMENT TIMEOUT EXCEEDED (60s).',
+      contingencyMessage: reason || 'DEPLOYMENT SIGNAL ACKNOWLEDGEMENT TIMEOUT EXCEEDED (>15s). NO SEPARATION BEACON RECEIVED.',
       historyLogs: [
         ...prev.historyLogs,
         {
           timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-          event: `CONTINGENCY TRIGGERED: ${reason || 'SIGNAL TIMEOUT'}`,
-          state: prev.states[prev.currentStateIndex]?.id
+          event: `⚠️ CONTINGENCY ALERT: ${reason || 'SIGNAL TIMEOUT — SATELLITE SEPARATION UNCONFIRMED'}`,
+          state: prev.states[prev.currentStateIndex]?.id,
+          type: 'warning'
         }
       ]
     }));
@@ -213,7 +287,15 @@ export const TelemetryProvider = ({ children }) => {
     await api.resolveContingency(action);
     setDeployment(prev => {
       let nextIdx = prev.currentStateIndex;
-      if (action === 'FORCE_CONFIRM') nextIdx = Math.min(prev.states.length - 1, prev.currentStateIndex + 1);
+      let logMsg = '';
+      if (action === 'FORCE_CONFIRM') {
+        nextIdx = 3; // Move to Initialization
+        logMsg = '✅ OPERATOR MANUALLY MARKED SEPARATION CONFIRMED — RESUMING BUS BOOT SEQUENCE';
+      } else if (action === 'RETRY') {
+        logMsg = '🔄 RETRYING TELEMETRY SWEEP FOR SEPARATION RF BEACON...';
+      } else {
+        logMsg = '🚨 CONTINGENCY ESCALATED TO MISSION DIRECTOR FOR TRAJECTORY ANALYSIS';
+      }
 
       return {
         ...prev,
@@ -224,12 +306,48 @@ export const TelemetryProvider = ({ children }) => {
           ...prev.historyLogs,
           {
             timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-            event: `CONTINGENCY RESOLVED VIA: ${action}`,
-            state: prev.states[nextIdx]?.id
+            event: logMsg,
+            state: prev.states[nextIdx]?.id,
+            type: action === 'FORCE_CONFIRM' ? 'success' : 'info'
           }
         ]
       };
     });
+
+    // If force confirmed, automatically progress to Initialization -> Commissioning -> Operational
+    if (action === 'FORCE_CONFIRM') {
+      setTimeout(() => {
+        setDeployment(prev => ({
+          ...prev,
+          currentStateIndex: 4, // Commissioning
+          historyLogs: [
+            ...prev.historyLogs,
+            {
+              timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
+              event: '🛰️ INITIALIZATION COMPLETE — SUBSYSTEM COMMISSIONING ENGAGED (EPS, ADCS, TT&C OK)',
+              state: 'COMMISSIONING',
+              type: 'info'
+            }
+          ]
+        }));
+
+        setTimeout(() => {
+          setDeployment(prev => ({
+            ...prev,
+            currentStateIndex: 5, // Operational
+            historyLogs: [
+              ...prev.historyLogs,
+              {
+                timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
+                event: '🎉 MISSION HANDOVER COMPLETE — SATELLITE IS FULLY OPERATIONAL IN ORBIT',
+                state: 'OPERATIONAL',
+                type: 'success'
+              }
+            ]
+          }));
+        }, 4000);
+      }, 3000);
+    }
   };
 
   // Settings update
@@ -259,6 +377,7 @@ export const TelemetryProvider = ({ children }) => {
         issueOverride,
         runScenarioTest,
         addScenario,
+        startDeploymentSequence,
         transitionDeploymentState,
         triggerContingency,
         resolveContingencyAction,
