@@ -55,7 +55,7 @@ export const TelemetryChart = () => {
         </div>
         <div className="telemetry-stat telemetry-stat-neutral">
           <span className="telemetry-stat-label">SIGNAL GAP</span>
-          <strong className="mono">{latest.battery != null && latest.linkQuality != null ? Math.abs(latest.battery - latest.linkQuality) : '--'}%</strong>
+          <strong className="mono">{latest.battery != null && latest.linkQuality != null ? Math.round(Math.abs(latest.battery - latest.linkQuality)) : '--'}%</strong>
         </div>
       </div>
 
