@@ -27,7 +27,7 @@ export const QueuePanel = () => {
 
       <div className="queue-list">
         {queue.map((item, idx) => (
-          <div key={item.id} className={`queue-item ${item.isStarved ? 'starved-item' : ''}`}>
+          <div key={item.id} className={`queue-item queue-item-${item.type.toLowerCase()} ${item.isStarved ? 'starved-item' : ''}`}>
             <div className="queue-rank mono">#{idx + 1}</div>
             
             <div className="queue-info">
@@ -73,6 +73,7 @@ export const QueuePanel = () => {
         }
 
         .queue-item {
+          --queue-glow: var(--accent-blue);
           display: flex;
           align-items: center;
           gap: 0.8rem;
@@ -84,8 +85,14 @@ export const QueuePanel = () => {
         }
 
         .queue-item:hover {
-          border-color: var(--border-highlight);
+          border-color: var(--queue-glow);
+          box-shadow: 0 0 14px color-mix(in srgb, var(--queue-glow) 26%, transparent);
         }
+
+        .queue-item-ttc { --queue-glow: var(--accent-red); }
+        .queue-item-sstv { --queue-glow: var(--accent-purple); }
+        .queue-item-codec2 { --queue-glow: var(--accent-blue); }
+        .queue-item-m17 { --queue-glow: var(--accent-green); }
 
         .queue-item.starved-item {
           border-color: var(--accent-amber);

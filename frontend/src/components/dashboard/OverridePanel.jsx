@@ -102,6 +102,7 @@ export const OverridePanel = () => {
         }
 
         .override-btn {
+          --override-color: var(--accent-blue);
           background-color: var(--bg-dark);
           border: 1px solid var(--border-color);
           border-radius: 6px;
@@ -113,14 +114,25 @@ export const OverridePanel = () => {
         }
 
         .override-btn:hover {
-          border-color: var(--accent-red);
+          border-color: var(--override-color);
+          box-shadow: 0 0 14px color-mix(in srgb, var(--override-color) 28%, transparent);
           transform: translateY(-1px);
         }
 
+        .btn-ttc { --override-color: var(--accent-red); }
+        .btn-sstv { --override-color: var(--accent-purple); }
+        .btn-codec2 { --override-color: var(--accent-blue); }
+        .btn-m17 { --override-color: var(--accent-green); }
+
+        .btn-ttc .btn-header { color: var(--accent-red); }
+        .btn-sstv .btn-header { color: var(--accent-purple); }
+        .btn-codec2 .btn-header { color: var(--accent-blue); }
+        .btn-m17 .btn-header { color: var(--accent-green); }
+
         .override-btn.active-mode {
-          border-color: var(--accent-red);
-          background-color: rgba(239, 68, 68, 0.1);
-          box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+          border-color: var(--override-color);
+          background-color: color-mix(in srgb, var(--override-color) 10%, var(--bg-dark));
+          box-shadow: 0 0 10px color-mix(in srgb, var(--override-color) 24%, transparent);
         }
 
         .btn-header {

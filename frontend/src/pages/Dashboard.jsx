@@ -5,27 +5,12 @@ import { TelemetryChart } from '../components/dashboard/TelemetryChart';
 import { QueuePanel } from '../components/dashboard/QueuePanel';
 import { DecisionLog } from '../components/dashboard/DecisionLog';
 import { OverridePanel } from '../components/dashboard/OverridePanel';
-import { useTelemetry } from '../context/TelemetryContext';
-import { Radio, RefreshCw } from 'lucide-react';
 
 export const Dashboard = () => {
-  const { telemetry, isPolling, setIsPolling, lastUpdated } = useTelemetry();
-
   return (
     <PageContainer
       title="ARBITER GROUND STATION DASHBOARD"
       subtitle="Real-time PocketQube telemetry, AI priority router telemetry queue, and operator override controls"
-      actions={
-        <div className="dashboard-actions">
-          <button
-            onClick={() => setIsPolling(!isPolling)}
-            className={`btn ${isPolling ? 'btn-outline' : 'btn-primary'} btn-sm`}
-          >
-            <RefreshCw size={14} className={isPolling ? 'spin' : ''} />
-            <span>{isPolling ? 'Polling Active (3s)' : 'Resume Polling'}</span>
-          </button>
-        </div>
-      }
     >
       <div className="dashboard-grid">
         {/* Top 3 Status Cards */}
@@ -63,12 +48,19 @@ export const Dashboard = () => {
           }
         }
 
-        .spin {
-          animation: spin-anim 4s linear infinite;
+        .dashboard-grid > .card,
+        .queue-decision-row > .card {
+          --card-glow: var(--accent-blue);
         }
 
-        @keyframes spin-anim {
-          100% { transform: rotate(360deg); }
+        .dashboard-grid .card {
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        .dashboard-grid .card:hover {
+          border-color: var(--card-glow);
+          box-shadow: 0 0 0 1px var(--card-glow), 0 0 22px color-mix(in srgb, var(--card-glow) 28%, transparent), var(--shadow-md);
+          transform: translateY(-2px);
         }
       `}</style>
     </PageContainer>
