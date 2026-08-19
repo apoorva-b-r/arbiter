@@ -18,7 +18,7 @@ export const TelemetryProvider = ({ children }) => {
   // Auth state
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('arbiter_user');
-    return saved ? JSON.parse(saved) : { username: 'Operator-Alpha', token: 'mock-jwt-token-12345' };
+    return saved ? JSON.parse(saved) : null;
   });
 
   // Global Mission Data State
@@ -115,9 +115,24 @@ export const TelemetryProvider = ({ children }) => {
 
   // Auth methods
   const login = (username, password) => {
-    const userData = { username, token: `token-${Date.now()}` };
+    const validUsername = 'Operator-Alpha';
+    const validPassword = 'arbiter2026';
+
+    if (
+      username.trim() !== validUsername ||
+      password !== validPassword
+    ) {
+      return false;
+    }
+
+    const userData = {
+      username: validUsername,
+      token: `token-${Date.now()}`
+    };
+
     setUser(userData);
     localStorage.setItem('arbiter_user', JSON.stringify(userData));
+
     return true;
   };
 
