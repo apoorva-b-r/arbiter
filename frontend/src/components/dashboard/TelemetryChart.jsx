@@ -22,7 +22,7 @@ export const TelemetryChart = () => {
       return (
         <div className="custom-chart-tooltip mono">
           <p className="tooltip-time">{label}</p>
-          <p className="tooltip-item" style={{ color: 'var(--color-raspberry)' }}>
+          <p className="tooltip-item" style={{ color: 'var(--alert-success-border)' }}>
             Battery: {payload[0]?.value}%
           </p>
           <p className="tooltip-item" style={{ color: 'var(--color-rose-pink)' }}>
@@ -38,18 +38,18 @@ export const TelemetryChart = () => {
     <div className="card chart-panel">
       <div className="card-header">
         <span className="card-title">
-          <Activity size={16} style={{ color: 'var(--color-rose-pink)' }} />
+          <Activity size={16} style={{ color: 'var(--color-soft-blush)' }} />
           Live Telemetry Trend (Battery vs Link Quality)
         </span>
         <span className="badge badge-rose mono">REALTIME STREAM</span>
       </div>
 
       <div className="telemetry-summary">
-        <div className="telemetry-stat telemetry-stat-raspberry">
+        <div className="telemetry-stat telemetry-stat-green">
           <span className="telemetry-stat-label">BATTERY</span>
           <strong className="mono">{latest.battery ?? '--'}%</strong>
         </div>
-        <div className="telemetry-stat telemetry-stat-rose">
+        <div className="telemetry-stat telemetry-stat-pink">
           <span className="telemetry-stat-label">LINK QUALITY</span>
           <strong className="mono">{latest.linkQuality ?? '--'}%</strong>
         </div>
@@ -64,11 +64,11 @@ export const TelemetryChart = () => {
           <AreaChart data={telemetryHistory} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="battery-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-raspberry)" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="var(--color-raspberry)" stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--alert-success-border)" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="var(--alert-success-border)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="link-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-rose-pink)" stopOpacity={0.25} />
+                <stop offset="0%" stopColor="var(--color-rose-pink)" stopOpacity={0.3} />
                 <stop offset="100%" stopColor="var(--color-rose-pink)" stopOpacity={0} />
               </linearGradient>
             </defs>
@@ -93,10 +93,10 @@ export const TelemetryChart = () => {
               type="monotone"
               dataKey="battery"
               name="Battery Level (%)"
-              stroke="var(--color-raspberry)"
-              strokeWidth={2.5}
+              stroke="var(--alert-success-border)"
+              strokeWidth={3}
               fill="url(#battery-fill)"
-              activeDot={{ r: 5, fill: 'var(--color-raspberry)' }}
+              activeDot={{ r: 6, fill: 'var(--alert-success-border)', stroke: '#fff', strokeWidth: 2 }}
             />
             <Area
               type="monotone"
@@ -104,8 +104,9 @@ export const TelemetryChart = () => {
               name="Link Quality (%)"
               stroke="var(--color-rose-pink)"
               strokeWidth={2.5}
+              strokeDasharray="6 3"
               fill="url(#link-fill)"
-              activeDot={{ r: 5, fill: 'var(--color-rose-pink)' }}
+              activeDot={{ r: 6, fill: 'var(--color-rose-pink)', stroke: '#fff', strokeWidth: 2 }}
             />
             <ReferenceLine y={50} stroke="var(--border-color)" strokeDasharray="4 4" />
           </AreaChart>
@@ -140,8 +141,8 @@ export const TelemetryChart = () => {
           border-radius: 8px;
         }
 
-        .telemetry-stat-raspberry { --stat-color: var(--color-raspberry); }
-        .telemetry-stat-rose { --stat-color: var(--color-rose-pink); }
+        .telemetry-stat-green { --stat-color: var(--alert-success-border); }
+        .telemetry-stat-pink { --stat-color: var(--color-rose-pink); }
         .telemetry-stat-berry { --stat-color: var(--color-berry-rose); }
         .telemetry-stat-label { color: var(--text-muted); font-size: 0.68rem; letter-spacing: 0.08em; font-weight: 700; }
         .telemetry-stat strong { color: var(--stat-color); font-size: 1rem; }

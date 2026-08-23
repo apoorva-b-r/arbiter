@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTelemetry } from '../context/TelemetryContext';
-import { Radio, Lock, User, ArrowRight, Shield } from 'lucide-react';
+import { Satellite, Lock, User, ArrowRight, Shield } from 'lucide-react';
 
 export const Login = () => {
   const { login } = useTelemetry();
@@ -29,7 +29,7 @@ export const Login = () => {
       <div className="login-card card">
         <div className="login-header">
           <div className="logo-box">
-            <Radio size={28} />
+            <Satellite size={28} strokeWidth={1.8} />
           </div>
           <h1 className="login-title">ARBITER</h1>
           <p className="login-subtitle">PocketQube Ground Station Mission Control Console</p>
