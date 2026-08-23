@@ -70,46 +70,6 @@ export const MOCK_QUEUE = [
   }
 ];
 
-export const MOCK_DECISIONS = [
-  {
-    id: 'DEC-809',
-    timestamp: '12:15:42',
-    selectedType: 'TTC',
-    reasoning: 'SAFETY OVERRIDE: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
-    isOverridden: false,
-    passId: 'PASS-20260817-09',
-    score: 345
-  },
-  {
-    id: 'DEC-808',
-    timestamp: '12:14:30',
-    selectedType: 'SSTV',
-    reasoning: 'SSTV selected: High link quality (92%) allows efficient transfer of 450KB frame. Priority score 215 exceeded candidates.',
-    isOverridden: false,
-    passId: 'PASS-20260817-09',
-    score: 215
-  },
-  {
-    id: 'DEC-807',
-    timestamp: '12:13:15',
-    selectedType: 'M17',
-    reasoning: 'OPERATOR OVERRIDE: Ground station engineer manually commanded M17 transmission.',
-    isOverridden: true,
-    overriddenType: 'M17',
-    passId: 'PASS-20260817-09',
-    score: 0
-  },
-  {
-    id: 'DEC-806',
-    timestamp: '12:12:00',
-    selectedType: 'TTC',
-    reasoning: 'TTC selected: Periodic beacon ping scheduled. Priority score 280.',
-    isOverridden: false,
-    passId: 'PASS-20260817-09',
-    score: 280
-  }
-];
-
 export const MOCK_PASS_HISTORY = [
   {
     passId: 'PASS-20260817-09',
@@ -117,11 +77,48 @@ export const MOCK_PASS_HISTORY = [
     startTime: '12:10:00 UTC',
     endTime: 'Active',
     durationSec: 600,
-    itemsSent: 14,
-    overrideCount: 1,
     status: 'ACTIVE',
     peakLinkQuality: 92,
-    avgBattery: 85.2
+    avgBattery: 85.2,
+    decisions: [
+      {
+        id: 'DEC-809',
+        timestamp: '12:15:42',
+        selectedType: 'TTC',
+        reasoning: 'SAFETY OVERRIDE: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
+        isOverridden: false,
+        passId: 'PASS-20260817-09',
+        score: 345
+      },
+      {
+        id: 'DEC-808',
+        timestamp: '12:14:30',
+        selectedType: 'SSTV',
+        reasoning: 'SSTV selected: High link quality (92%) allows efficient transfer of 450KB frame. Priority score 215 exceeded candidates.',
+        isOverridden: false,
+        passId: 'PASS-20260817-09',
+        score: 215
+      },
+      {
+        id: 'DEC-807',
+        timestamp: '12:13:15',
+        selectedType: 'M17',
+        reasoning: 'OPERATOR OVERRIDE: Ground station engineer manually commanded M17 transmission.',
+        isOverridden: true,
+        overriddenType: 'M17',
+        passId: 'PASS-20260817-09',
+        score: 0
+      },
+      {
+        id: 'DEC-806',
+        timestamp: '12:12:00',
+        selectedType: 'TTC',
+        reasoning: 'TTC selected: Periodic beacon ping scheduled. Priority score 280.',
+        isOverridden: false,
+        passId: 'PASS-20260817-09',
+        score: 280
+      }
+    ]
   },
   {
     passId: 'PASS-20260817-08',
@@ -129,11 +126,47 @@ export const MOCK_PASS_HISTORY = [
     startTime: '10:32:15 UTC',
     endTime: '10:42:15 UTC',
     durationSec: 600,
-    itemsSent: 22,
-    overrideCount: 0,
     status: 'COMPLETED',
     peakLinkQuality: 95,
-    avgBattery: 88.0
+    avgBattery: 88.0,
+    decisions: [
+      {
+        id: 'DEC-706',
+        timestamp: '10:41:00',
+        selectedType: 'TTC',
+        reasoning: 'TTC selected: Housekeeping beacon dispatched prior to pass loss of signal. Priority score 310.',
+        isOverridden: false,
+        passId: 'PASS-20260817-08',
+        score: 310
+      },
+      {
+        id: 'DEC-705',
+        timestamp: '10:39:10',
+        selectedType: 'SSTV',
+        reasoning: 'SSTV selected: Image frame payload transmitted at peak SNR 19.5 dB. Priority score 240.',
+        isOverridden: false,
+        passId: 'PASS-20260817-08',
+        score: 240
+      },
+      {
+        id: 'DEC-704',
+        timestamp: '10:37:25',
+        selectedType: 'Codec2',
+        reasoning: 'Codec2 selected: Low bitrate voice stream dispatched during nominal link window. Priority score 165.',
+        isOverridden: false,
+        passId: 'PASS-20260817-08',
+        score: 165
+      },
+      {
+        id: 'DEC-703',
+        timestamp: '10:35:00',
+        selectedType: 'TTC',
+        reasoning: 'TTC selected: Initial beacon handshake completed. Priority score 295.',
+        isOverridden: false,
+        passId: 'PASS-20260817-08',
+        score: 295
+      }
+    ]
   },
   {
     passId: 'PASS-20260817-07',
@@ -141,11 +174,58 @@ export const MOCK_PASS_HISTORY = [
     startTime: '08:54:00 UTC',
     endTime: '09:04:00 UTC',
     durationSec: 600,
-    itemsSent: 18,
-    overrideCount: 2,
     status: 'COMPLETED',
     peakLinkQuality: 78,
-    avgBattery: 79.5
+    avgBattery: 79.5,
+    decisions: [
+      {
+        id: 'DEC-605',
+        timestamp: '09:02:40',
+        selectedType: 'Codec2',
+        reasoning: 'OPERATOR OVERRIDE: Ground station engineer commanded voice link priority during contingency drill.',
+        isOverridden: true,
+        overriddenType: 'Codec2',
+        passId: 'PASS-20260817-07',
+        score: 0
+      },
+      {
+        id: 'DEC-604',
+        timestamp: '09:00:15',
+        selectedType: 'TTC',
+        reasoning: 'SAFETY OVERRIDE: TT&C wait time (128s) exceeded 120s starvation threshold. High priority dispatch forced.',
+        isOverridden: false,
+        passId: 'PASS-20260817-07',
+        score: 350
+      },
+      {
+        id: 'DEC-603',
+        timestamp: '08:58:10',
+        selectedType: 'M17',
+        reasoning: 'OPERATOR OVERRIDE: Ground station operator forced M17 digital voice transmission.',
+        isOverridden: true,
+        overriddenType: 'M17',
+        passId: 'PASS-20260817-07',
+        score: 0
+      },
+      {
+        id: 'DEC-602',
+        timestamp: '08:56:00',
+        selectedType: 'SSTV',
+        reasoning: 'SSTV selected: Earth observation telemetry frame queue processed. Priority score 190.',
+        isOverridden: false,
+        passId: 'PASS-20260817-07',
+        score: 190
+      },
+      {
+        id: 'DEC-601',
+        timestamp: '08:54:12',
+        selectedType: 'TTC',
+        reasoning: 'TTC selected: Primary housekeeping telemetry beacon initialized on pass acquisition. Priority score 285.',
+        isOverridden: false,
+        passId: 'PASS-20260817-07',
+        score: 285
+      }
+    ]
   },
   {
     passId: 'PASS-20260816-06',
@@ -153,13 +233,51 @@ export const MOCK_PASS_HISTORY = [
     startTime: '23:15:30 UTC',
     endTime: '23:25:30 UTC',
     durationSec: 600,
-    itemsSent: 25,
-    overrideCount: 0,
     status: 'COMPLETED',
     peakLinkQuality: 98,
-    avgBattery: 91.2
+    avgBattery: 91.2,
+    decisions: [
+      {
+        id: 'DEC-504',
+        timestamp: '23:23:45',
+        selectedType: 'TTC',
+        reasoning: 'TTC selected: Final pass health telemetry dispatched. Priority score 320.',
+        isOverridden: false,
+        passId: 'PASS-20260816-06',
+        score: 320
+      },
+      {
+        id: 'DEC-503',
+        timestamp: '23:21:10',
+        selectedType: 'SSTV',
+        reasoning: 'SSTV selected: Full resolution camera payload transferred at 98% link quality. Priority score 260.',
+        isOverridden: false,
+        passId: 'PASS-20260816-06',
+        score: 260
+      },
+      {
+        id: 'DEC-502',
+        timestamp: '23:18:30',
+        selectedType: 'M17',
+        reasoning: 'M17 selected: Packet batch cleared from transmission queue. Priority score 180.',
+        isOverridden: false,
+        passId: 'PASS-20260816-06',
+        score: 180
+      },
+      {
+        id: 'DEC-501',
+        timestamp: '23:15:45',
+        selectedType: 'TTC',
+        reasoning: 'TTC selected: Automatic beacon acquisition signal sent. Priority score 290.',
+        isOverridden: false,
+        passId: 'PASS-20260816-06',
+        score: 290
+      }
+    ]
   }
 ];
+
+export const MOCK_DECISIONS = MOCK_PASS_HISTORY.flatMap(p => p.decisions || []);
 
 export const MOCK_SCENARIOS = [
   {

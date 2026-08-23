@@ -24,23 +24,80 @@ let queueItems = [
   { id: 'Q-104', itemId: 'Q-104', type: 'M17', label: 'Digital Voice Packet Batch', sizeKb: 128, waitTimeSec: 18, baseWeight: 30, priorityScore: 92, status: 'PENDING', isStarved: false }
 ];
 
-let decisionLog = [
+let passes = [
   {
-    id: 'DEC-809',
-    decisionId: 'DEC-809',
-    timestamp: '12:15:42',
-    selectedType: 'TTC',
-    reasoning: 'SAFETY OVERRIDE: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
-    isOverridden: false,
     passId: 'PASS-20260817-09',
-    score: 345
+    date: '2026-08-17',
+    startTime: '12:10:00 UTC',
+    endTime: 'Active',
+    durationSec: 600,
+    status: 'ACTIVE',
+    peakLinkQuality: 92,
+    avgBattery: 85.2,
+    decisions: [
+      {
+        id: 'DEC-809',
+        timestamp: '12:15:42',
+        selectedType: 'TTC',
+        reasoning: 'SAFETY OVERRIDE: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
+        isOverridden: false,
+        passId: 'PASS-20260817-09',
+        score: 345
+      },
+      {
+        id: 'DEC-808',
+        timestamp: '12:14:30',
+        selectedType: 'SSTV',
+        reasoning: 'SSTV selected: High link quality (92%) allows efficient transfer of 450KB frame. Priority score 215 exceeded candidates.',
+        isOverridden: false,
+        passId: 'PASS-20260817-09',
+        score: 215
+      },
+      {
+        id: 'DEC-807',
+        timestamp: '12:13:15',
+        selectedType: 'M17',
+        reasoning: 'OPERATOR OVERRIDE: Ground station engineer manually commanded M17 transmission.',
+        isOverridden: true,
+        overriddenType: 'M17',
+        passId: 'PASS-20260817-09',
+        score: 0
+      }
+    ]
+  },
+  {
+    passId: 'PASS-20260817-08',
+    date: '2026-08-17',
+    startTime: '10:32:15 UTC',
+    endTime: '10:42:15 UTC',
+    durationSec: 600,
+    status: 'COMPLETED',
+    peakLinkQuality: 95,
+    avgBattery: 88.0,
+    decisions: [
+      {
+        id: 'DEC-706',
+        timestamp: '10:41:00',
+        selectedType: 'TTC',
+        reasoning: 'TTC selected: Housekeeping beacon dispatched prior to pass loss of signal. Priority score 310.',
+        isOverridden: false,
+        passId: 'PASS-20260817-08',
+        score: 310
+      },
+      {
+        id: 'DEC-705',
+        timestamp: '10:39:10',
+        selectedType: 'SSTV',
+        reasoning: 'SSTV selected: Image frame payload transmitted at peak SNR 19.5 dB.',
+        isOverridden: false,
+        passId: 'PASS-20260817-08',
+        score: 240
+      }
+    ]
   }
 ];
 
-let passes = [
-  { passId: 'PASS-20260817-09', date: '2026-08-17', startTime: '12:10:00 UTC', endTime: 'Active', durationSec: 600, itemsSent: 14, overrideCount: 1, status: 'ACTIVE', peakLinkQuality: 92, avgBattery: 85.2 },
-  { passId: 'PASS-20260817-08', date: '2026-08-17', startTime: '10:32:15 UTC', endTime: '10:42:15 UTC', durationSec: 600, itemsSent: 22, overrideCount: 0, status: 'COMPLETED', peakLinkQuality: 95, avgBattery: 88.0 }
-];
+let decisionLog = passes.flatMap(p => p.decisions);
 
 let intervalId = null;
 
@@ -115,6 +172,11 @@ function applyOverride(mode) {
     score: 0
   };
   decisionLog.unshift(newDec);
+  const activePass = passes.find(p => p.passId === currentTelemetry.currentPassId);
+  if (activePass) {
+    if (!activePass.decisions) activePass.decisions = [];
+    activePass.decisions.unshift(newDec);
+  }
   return newDec;
 }
 

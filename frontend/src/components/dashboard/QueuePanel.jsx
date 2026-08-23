@@ -29,7 +29,7 @@ export const QueuePanel = () => {
         {queue.map((item, idx) => (
           <div key={item.id} className={`queue-item queue-item-${item.type.toLowerCase()} ${item.isStarved ? 'starved-item' : ''}`}>
             <div className="queue-rank mono">#{idx + 1}</div>
-            
+
             <div className="queue-info">
               <div className="queue-header-line">
                 <span className={`badge ${getTypeBadge(item.type)}`}>{item.type}</span>
@@ -42,7 +42,7 @@ export const QueuePanel = () => {
                 {item.isStarved && (
                   <span className="starved-tag">
                     <AlertTriangle size={12} />
-                    STARVATION TRIGGER (&gt;120s)
+                    STARVATION TRIGGER
                   </span>
                 )}
               </div>

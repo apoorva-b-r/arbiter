@@ -197,7 +197,7 @@ export const TelemetryProvider = ({ children }) => {
       setPasses(prev =>
         prev.map(p =>
           p.passId === telemetry.currentPassId
-            ? { ...p, overrideCount: p.overrideCount + 1 }
+            ? { ...p, decisions: [newDecision, ...(p.decisions || [])] }
             : p
         )
       );
