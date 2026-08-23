@@ -1,27 +1,45 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTelemetry } from '../context/TelemetryContext';
-import { Satellite, Lock, User, ArrowRight, Shield } from 'lucide-react';
+import { Satellite, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export const Login = () => {
   const { login } = useTelemetry();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({ username: '', password: '' });
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    setError('');
+    const nextErrors = { username: '', password: '' };
+    const trimmedUsername = username.trim();
 
-    const success = login(username, password);
-
-    if (success) {
-      navigate('/dashboard', { replace: true });
-    } else {
-      setError('Invalid Operator ID or Access Passcode.');
+    if (!trimmedUsername) {
+      nextErrors.username = 'Please fill in the username.';
     }
+    if (!password) {
+      nextErrors.password = 'Please fill in the password.';
+    }
+
+    if (nextErrors.username || nextErrors.password) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    const result = login(username, password);
+
+    if (result.ok) {
+      setErrors({ username: '', password: '' });
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+
+    if (!result.usernameOk) nextErrors.username = 'Incorrect Operator ID.';
+    if (!result.passwordOk) nextErrors.password = 'Incorrect password entered.';
+    setErrors(nextErrors);
   };
 
   return (
@@ -32,48 +50,68 @@ export const Login = () => {
             <Satellite size={28} strokeWidth={1.8} />
           </div>
           <h1 className="login-title">ARBITER</h1>
-          <p className="login-subtitle">PocketQube Ground Station Mission Control Console</p>
+          <p className="login-subtitle">PocketQube Ground Station Mission Control</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="login-form">
+        <form onSubmit={handleSubmit} className="login-form" noValidate>
           <div className="form-group">
-            <label className="form-label">Ground Station Callshare / Operator ID</label>
+            <label className="form-label" htmlFor="operator-id">Operator ID</label>
             <div className="input-with-icon">
               <User size={16} className="input-icon" />
               <input
+                id="operator-id"
                 type="text"
                 className="form-input mono"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (errors.username) setErrors((prev) => ({ ...prev, username: '' }));
+                }}
+                autoComplete="username"
                 required
               />
             </div>
+            {errors.username && (
+              <p className="field-error" role="alert">{errors.username}</p>
+            )}
           </div>
 
           <div className="form-group">
-            <label className="form-label">Access Passcode</label>
+            <label className="form-label" htmlFor="access-passcode">Passcode</label>
             <div className="input-with-icon">
               <Lock size={16} className="input-icon" />
               <input
-                type="password"
-                className="form-input mono"
+                id="access-passcode"
+                type={showPassword ? 'text' : 'password'}
+                className="form-input mono password-input"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) setErrors((prev) => ({ ...prev, password: '' }));
+                }}
+                autoComplete="current-password"
                 required
               />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
+            {errors.password && (
+              <p className="field-error" role="alert">{errors.password}</p>
+            )}
           </div>
 
           <button type="submit" className="btn btn-primary login-submit-btn">
-            <span>Authenticate Ground Session</span>
+            <span>Login</span>
             <ArrowRight size={16} />
           </button>
         </form>
-
-        <div className="login-footer">
-          <Shield size={12} />
-          <span className="mono text-xs">RESTRICTED OPERATIONAL ACCESS • K.J. SOMAIYA INSTITUTE OF TECHNOLOGY</span>
-        </div>
       </div>
 
       <style>{`
@@ -136,11 +174,44 @@ export const Login = () => {
           position: absolute;
           left: 0.8rem;
           color: var(--text-muted);
+          pointer-events: none;
         }
 
         .input-with-icon .form-input {
           padding-left: 2.5rem;
           width: 100%;
+        }
+
+        .password-input {
+          padding-right: 2.6rem;
+        }
+
+        .password-toggle {
+          position: absolute;
+          right: 0.55rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 1.8rem;
+          height: 1.8rem;
+          border: none;
+          background: transparent;
+          color: var(--text-muted);
+          cursor: pointer;
+          border-radius: 6px;
+        }
+
+        .password-toggle:hover,
+        .password-toggle:focus-visible {
+          color: var(--color-berry-rose);
+          outline: none;
+        }
+
+        .field-error {
+          margin: 0;
+          color: #dc2626;
+          font-size: 0.78rem;
+          font-weight: 600;
         }
 
         .login-submit-btn {
@@ -149,17 +220,6 @@ export const Login = () => {
           padding: 0.75rem;
           font-size: 0.95rem;
           border-radius: 12px;
-        }
-
-        .login-footer {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.4rem;
-          margin-top: 1.5rem;
-          padding-top: 1rem;
-          border-top: 1px solid var(--border-color);
-          color: var(--text-muted);
         }
       `}</style>
     </div>

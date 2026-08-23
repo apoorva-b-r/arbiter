@@ -150,13 +150,13 @@ export const TelemetryProvider = ({ children }) => {
   // Auth methods
   const login = (username, password) => {
     const validUsername = 'Operator-Alpha';
-    const validPassword = 'arbiter2026';
+    const validPassword = 'Arbiter2026!';
 
-    if (
-      username.trim() !== validUsername ||
-      password !== validPassword
-    ) {
-      return false;
+    const usernameOk = username.trim() === validUsername;
+    const passwordOk = password === validPassword;
+
+    if (!usernameOk || !passwordOk) {
+      return { ok: false, usernameOk, passwordOk };
     }
 
     const userData = {
@@ -167,7 +167,7 @@ export const TelemetryProvider = ({ children }) => {
     setUser(userData);
     localStorage.setItem('arbiter_user', JSON.stringify(userData));
 
-    return true;
+    return { ok: true, usernameOk: true, passwordOk: true };
   };
 
   const logout = () => {
