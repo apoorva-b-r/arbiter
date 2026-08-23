@@ -29,20 +29,20 @@ export const MOCK_QUEUE = [
     type: 'TTC',
     label: 'Critical Telemetry & Beacon',
     sizeKb: 12,
-    waitTimeSec: 135,
+    waitTimeSec: 45,
     baseWeight: 100,
-    priorityScore: 345,
+    priorityScore: 145,
     status: 'PENDING',
-    isStarved: true // >120s trigger
+    isStarved: false
   },
   {
     id: 'Q-102',
     type: 'SSTV',
     label: 'Earth Observation Frame #44',
     sizeKb: 450,
-    waitTimeSec: 85,
+    waitTimeSec: 40,
     baseWeight: 60,
-    priorityScore: 215,
+    priorityScore: 100,
     status: 'PENDING',
     isStarved: false
   },
@@ -51,9 +51,9 @@ export const MOCK_QUEUE = [
     type: 'Codec2',
     label: 'Compressed Voice Beacon Stream',
     sizeKb: 64,
-    waitTimeSec: 42,
+    waitTimeSec: 35,
     baseWeight: 40,
-    priorityScore: 135,
+    priorityScore: 75,
     status: 'PENDING',
     isStarved: false
   },
@@ -62,9 +62,9 @@ export const MOCK_QUEUE = [
     type: 'M17',
     label: 'Digital Voice Packet Batch',
     sizeKb: 128,
-    waitTimeSec: 18,
+    waitTimeSec: 30,
     baseWeight: 30,
-    priorityScore: 92,
+    priorityScore: 60,
     status: 'PENDING',
     isStarved: false
   }

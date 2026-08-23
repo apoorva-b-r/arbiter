@@ -8,9 +8,14 @@ import { Rocket, Clock, ShieldAlert, CheckCircle2 } from 'lucide-react';
 export const Deployment = () => {
   const {
     deployment,
-    startDeploymentSequence,
-    transitionDeploymentState,
-    triggerContingency,
+    inspectState,
+    clearInspection,
+    runLaunchSequenceDemo,
+    runTimeoutContingency,
+    retryVerification,
+    checkSecondaryBeacon,
+    escalateContingency,
+    manualConfirmSeparation,
     resolveContingencyAction
   } = useTelemetry();
 
@@ -24,6 +29,13 @@ export const Deployment = () => {
         {deployment.contingencyActive && (
           <ContingencyBanner
             message={deployment.contingencyMessage}
+            contingencyStatus={deployment.contingencyStatus}
+            retryCount={deployment.retryCount}
+            secondaryBeaconData={deployment.secondaryBeaconData}
+            onRetry={retryVerification}
+            onCheckSecondary={checkSecondaryBeacon}
+            onEscalate={escalateContingency}
+            onForceConfirm={manualConfirmSeparation}
             onResolve={resolveContingencyAction}
           />
         )}
@@ -31,9 +43,10 @@ export const Deployment = () => {
         {/* State Machine Step View */}
         <StateMachineView
           deploymentState={deployment}
-          onSelectState={transitionDeploymentState}
-          onStartSequence={startDeploymentSequence}
-          onSimulateContingency={() => triggerContingency('DEPLOYMENT SIGNAL ACKNOWLEDGEMENT TIMEOUT EXCEEDED (>15s). NO SEPARATION BEACON RECEIVED.')}
+          onSelectState={inspectState}
+          onClearInspection={clearInspection}
+          onStartSequence={runLaunchSequenceDemo}
+          onSimulateContingency={runTimeoutContingency}
         />
 
         {/* State Transition Log Timeline */}

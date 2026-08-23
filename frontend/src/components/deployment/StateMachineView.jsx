@@ -1,13 +1,24 @@
 import React from 'react';
-import { CheckCircle2, Circle, AlertCircle, PlayCircle, Clock, Play, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Circle, AlertCircle, PlayCircle, Play, X } from 'lucide-react';
 
 export const StateMachineView = ({
   deploymentState,
   onSelectState,
+  onClearInspection,
   onStartSequence,
   onSimulateContingency
 }) => {
-  const { currentStateIndex, states, contingencyActive } = deploymentState;
+  const {
+    currentStateIndex,
+    inspectedStateIndex,
+    states,
+    contingencyActive,
+    timeElapsedSec,
+    timeoutDurationSec
+  } = deploymentState;
+
+  const isInspecting = inspectedStateIndex !== null && inspectedStateIndex !== undefined;
+  const displayIndex = isInspecting ? inspectedStateIndex : currentStateIndex;
 
   return (
     <div className="card state-machine-panel">
@@ -37,12 +48,14 @@ export const StateMachineView = ({
           const isDone = idx < currentStateIndex;
           const isCurrent = idx === currentStateIndex;
           const isFuture = idx > currentStateIndex;
+          const isInspectedNode = idx === inspectedStateIndex;
 
           return (
             <div key={st.id} className="pipeline-node-wrapper">
               <div
-                className={`pipeline-node ${isDone ? 'node-done' : ''} ${isCurrent ? 'node-current' : ''} ${contingencyActive && isCurrent ? 'node-contingency' : ''}`}
+                className={`pipeline-node ${isDone ? 'node-done' : ''} ${isCurrent ? 'node-current' : ''} ${contingencyActive && isCurrent ? 'node-contingency' : ''} ${isInspectedNode ? 'node-inspected' : ''}`}
                 onClick={() => onSelectState(idx)}
+                title="Click stage box to inspect details without altering actual satellite state"
               >
                 <div className="node-icon">
                   {isDone && <CheckCircle2 size={20} className="text-green" />}
@@ -66,11 +79,28 @@ export const StateMachineView = ({
 
       <div className="current-state-details card">
         <div className="details-header">
-          <span className="badge badge-blue mono">ACTIVE STATE DETAILS</span>
-          <span className="state-timestamp mono">Elapsed: {deploymentState.timeElapsedSec}s / Timeout: {deploymentState.timeoutDurationSec}s</span>
+          <div className="header-badge-group">
+            {isInspecting ? (
+              <div className="inspect-badge-container">
+                <span className="badge badge-purple mono">INSPECTING STAGE 0{inspectedStateIndex + 1}</span>
+                <button
+                  onClick={onClearInspection}
+                  className="btn-clear-inspect mono"
+                  title="Return to actual satellite state details"
+                >
+                  <X size={12} /> Clear ×
+                </button>
+              </div>
+            ) : (
+              <span className="badge badge-blue mono">ACTIVE STATE DETAILS</span>
+            )}
+          </div>
+          <span className="state-timestamp mono">
+            Elapsed: {timeElapsedSec}s / Timeout: {timeoutDurationSec}s
+          </span>
         </div>
-        <h3 className="state-name-display">{states[currentStateIndex]?.label}</h3>
-        <p className="state-desc-display">{states[currentStateIndex]?.description}</p>
+        <h3 className="state-name-display">{states[displayIndex]?.label}</h3>
+        <p className="state-desc-display">{states[displayIndex]?.description}</p>
       </div>
 
       <style>{`
@@ -133,6 +163,11 @@ export const StateMachineView = ({
           animation: pulse-amber 1.5s infinite;
         }
 
+        .pipeline-node.node-inspected {
+          outline: 2px dashed var(--accent-purple);
+          outline-offset: 2px;
+        }
+
         .node-step {
           font-size: 0.65rem;
           color: var(--color-berry-rose);
@@ -171,6 +206,36 @@ export const StateMachineView = ({
           margin-bottom: 0.5rem;
         }
 
+        .header-badge-group {
+          display: flex;
+          align-items: center;
+        }
+
+        .inspect-badge-container {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .btn-clear-inspect {
+          background: none;
+          border: 1px solid var(--accent-purple);
+          color: var(--accent-purple);
+          font-size: 0.72rem;
+          padding: 0.15rem 0.45rem;
+          border-radius: 6px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 0.2rem;
+          transition: all 0.15s ease;
+        }
+
+        .btn-clear-inspect:hover {
+          background-color: var(--accent-purple);
+          color: #ffffff;
+        }
+
         .state-timestamp {
           font-size: 0.78rem;
           color: var(--color-berry-rose);
@@ -191,3 +256,4 @@ export const StateMachineView = ({
     </div>
   );
 };
+

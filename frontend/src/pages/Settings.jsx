@@ -26,8 +26,17 @@ export const Settings = () => {
   };
 
   const handleReset = () => {
-    setWeights({ TTC: 100, SSTV: 60, Codec2: 40, M17: 30 });
-    setTtcTimeout(120);
+    const defaultWeights = { TTC: 100, SSTV: 60, Codec2: 40, M17: 30 };
+    const defaultTimeout = 120;
+    setWeights(defaultWeights);
+    setTtcTimeout(defaultTimeout);
+    saveRouterSettings({
+      ...settings,
+      baseWeights: defaultWeights,
+      ttcStarvationTimeoutSec: defaultTimeout
+    });
+    setSavedAck(true);
+    setTimeout(() => setSavedAck(false), 2500);
   };
 
   return (

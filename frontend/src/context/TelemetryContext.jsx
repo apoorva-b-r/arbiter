@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../api/client';
+import { useDeploymentState } from '../hooks/useDeploymentState';
 import {
   MOCK_TELEMETRY,
   MOCK_TELEMETRY_HISTORY,
@@ -8,9 +9,47 @@ import {
   MOCK_PASS_HISTORY,
   MOCK_SCENARIOS,
   MOCK_VALIDATION_RUNS,
-  MOCK_DEPLOYMENT_STATE,
   MOCK_ROUTER_SETTINGS
 } from '../api/mockData';
+
+// Calculate single queue item score using exact router formula
+export const calculatePriorityScore = (item, telemetry, routerSettings) => {
+  const baseWeights = routerSettings?.baseWeights || { TTC: 100, SSTV: 60, Codec2: 40, M17: 30 };
+  const ttcTimeout = routerSettings?.ttcStarvationTimeoutSec ?? 120;
+  const batteryThresholdLow = routerSettings?.batteryThresholdLow ?? 30;
+
+  const baseWeight = baseWeights[item.type] ?? item.baseWeight ?? 30;
+  const waitBonus = (item.waitTimeSec || 0) * 1.5;
+  const linkBonus = (telemetry?.linkQuality || 80) * 0.8;
+
+  let score = baseWeight + waitBonus + linkBonus;
+
+  // Battery low penalty for heavy payload (SSTV)
+  if ((telemetry?.battery || 80) < batteryThresholdLow && item.type === 'SSTV') {
+    score -= 150;
+  }
+
+  const roundedScore = Math.round(score);
+
+  // Check Safety Override Constraint: TT&C wait time >= ttcStarvationTimeoutSec
+  const isStarved = item.type === 'TTC' && item.waitTimeSec >= ttcTimeout;
+
+  // Starvation forces TT&C to top priority by adding high override score bonus
+  const finalScore = isStarved ? roundedScore + 10000 : roundedScore;
+
+  return {
+    ...item,
+    baseWeight,
+    priorityScore: finalScore,
+    isStarved
+  };
+};
+
+export const computePriorityQueue = (rawQueue, telemetry, routerSettings) => {
+  return rawQueue
+    .map(item => calculatePriorityScore(item, telemetry, routerSettings))
+    .sort((a, b) => b.priorityScore - a.priorityScore);
+};
 
 const TelemetryContext = createContext(null);
 
@@ -24,94 +63,89 @@ export const TelemetryProvider = ({ children }) => {
   // Global Mission Data State
   const [telemetry, setTelemetry] = useState(MOCK_TELEMETRY);
   const [telemetryHistory, setTelemetryHistory] = useState(MOCK_TELEMETRY_HISTORY);
-  const [queue, setQueue] = useState(MOCK_QUEUE);
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem('arbiter_router_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return MOCK_ROUTER_SETTINGS;
+  });
+
+  const [queue, setQueue] = useState(() => computePriorityQueue(MOCK_QUEUE, MOCK_TELEMETRY, settings));
   const [decisions, setDecisions] = useState(MOCK_DECISIONS);
   const [passes, setPasses] = useState(MOCK_PASS_HISTORY);
   const [scenarios, setScenarios] = useState(MOCK_SCENARIOS);
   const [validationRuns, setValidationRuns] = useState(MOCK_VALIDATION_RUNS);
-  const [deployment, setDeployment] = useState(MOCK_DEPLOYMENT_STATE);
-  const [settings, setSettings] = useState(MOCK_ROUTER_SETTINGS);
   const [isPolling, setIsPolling] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
+  // Automatically update queue scoring and sorting whenever settings change
+  useEffect(() => {
+    setQueue(prevQueue => computePriorityQueue(prevQueue, telemetry, settings));
+  }, [settings]);
+
+  // Dedicated Satellite Deployment State Machine Hook
+  const deploymentStateHook = useDeploymentState();
+  const {
+    deployment,
+    inspectState,
+    clearInspection,
+    runLaunchSequenceDemo,
+    runTimeoutContingency,
+    retryVerification,
+    checkSecondaryBeacon,
+    escalateContingency,
+    manualConfirmSeparation,
+    transitionDeploymentState,
+    triggerContingency,
+    resolveContingencyAction
+  } = deploymentStateHook;
+
   // Real-time telemetry simulation fluctuation for live visual demo
   const simulateLiveTick = () => {
+    let nextTelemetry = telemetry;
     setTelemetry(prev => {
-      // Dynamic link quality fluctuation (simulating atmospheric noise & orbital pass)
       const linkDelta = Math.floor(Math.random() * 7) - 3;
       const newLink = Math.max(20, Math.min(100, prev.linkQuality + linkDelta));
       
-      // Battery fluctuation (drains when transmitting, recharges slightly)
       const batDelta = (prev.activeMode === 'SSTV' ? -0.3 : -0.1) + 0.05;
       const newBat = Math.max(15, Math.min(100, Math.round((prev.battery + batDelta) * 10) / 10));
 
       const newSnr = Math.round((newLink / 5) * 10) / 10;
 
-      // Append point to history
       const nowStr = new Date().toTimeString().substring(0, 8);
-      setTelemetryHistory(h => {
-        const updated = [...h.slice(1), { time: nowStr, battery: newBat, linkQuality: newLink, snr: newSnr }];
-        return updated;
-      });
+      setTelemetryHistory(h => [
+        ...h.slice(1),
+        { time: nowStr, battery: newBat, linkQuality: newLink, snr: newSnr }
+      ]);
 
-      return {
+      nextTelemetry = {
         ...prev,
         battery: newBat,
         linkQuality: newLink,
         snr: newSnr
       };
+      return nextTelemetry;
     });
 
-    // Tick queue wait times
-    setQueue(q =>
-      q.map(item => {
-        const newWait = item.waitTimeSec + 3;
-        const isStarved = item.type === 'TTC' && newWait > 120;
-        const newScore = item.baseWeight + Math.round(newWait * 1.5) + (isStarved ? 200 : 0);
-        return {
-          ...item,
-          waitTimeSec: newWait,
-          priorityScore: newScore,
-          isStarved
-        };
-      }).sort((a, b) => b.priorityScore - a.priorityScore)
-    );
+    setQueue(prevQueue => {
+      const tickedQueue = prevQueue.map(item => ({
+        ...item,
+        waitTimeSec: item.waitTimeSec + 3
+      }));
+      return computePriorityQueue(tickedQueue, nextTelemetry, settings);
+    });
 
     setLastUpdated(new Date());
   };
 
-  // Poll server or run tick interval
   useEffect(() => {
     if (!isPolling) return;
-
-    const fetchAll = async () => {
-      try {
-        const tData = await api.getTelemetry();
-        if (tData) setTelemetry(tData);
-
-        const thData = await api.getTelemetryHistory();
-        if (thData) setTelemetryHistory(thData);
-
-        const qData = await api.getQueue();
-        if (qData) setQueue(qData);
-
-        const dData = await api.getDecisions();
-        if (dData) setDecisions(dData);
-
-        const pData = await api.getPasses();
-        if (pData) setPasses(pData);
-
-        const dState = await api.getDeploymentState();
-        if (dState) setDeployment(dState);
-      } catch (err) {
-        console.error('Polling error:', err);
-      }
-      simulateLiveTick();
-    };
-
-    const interval = setInterval(fetchAll, 3000);
+    const interval = setInterval(simulateLiveTick, 3000);
     return () => clearInterval(interval);
-  }, [isPolling]);
+  }, [isPolling, settings]);
 
   // Auth methods
   const login = (username, password) => {
@@ -141,12 +175,10 @@ export const TelemetryProvider = ({ children }) => {
     localStorage.removeItem('arbiter_user');
   };
 
-  // Operator action: Manual override next transmission
   const issueOverride = async (mode) => {
     try {
       await api.sendOverride(mode);
       
-      // Update local state immediately
       setTelemetry(t => ({ ...t, activeMode: mode }));
 
       const newDecision = {
@@ -162,7 +194,6 @@ export const TelemetryProvider = ({ children }) => {
 
       setDecisions(prev => [newDecision, ...prev]);
       
-      // Increment pass override count
       setPasses(prev =>
         prev.map(p =>
           p.passId === telemetry.currentPassId
@@ -175,7 +206,6 @@ export const TelemetryProvider = ({ children }) => {
     }
   };
 
-  // Validation module actions
   const runScenarioTest = async (scenarioId) => {
     const res = await api.runScenario(scenarioId);
     return res;
@@ -189,171 +219,12 @@ export const TelemetryProvider = ({ children }) => {
     return res;
   };
 
-  // Deployment state machine actions
-  const [deploymentTimer, setDeploymentTimer] = useState(null);
-
-  const startDeploymentSequence = () => {
-    // Reset to Stowed
-    setDeployment(prev => ({
-      ...prev,
-      currentStateIndex: 0,
-      contingencyActive: false,
-      contingencyMessage: '',
-      timeElapsedSec: 0,
-      historyLogs: [
-        {
-          timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-          event: '🚀 MISSION CONTROL INITIATED LAUNCH VEHOLDER DEPLOYMENT SEQUENCE',
-          state: 'STOWED',
-          type: 'info'
-        }
-      ]
-    }));
-
-    // Step 1 -> Release Triggered after 2 seconds
-    setTimeout(() => {
-      setDeployment(prev => ({
-        ...prev,
-        currentStateIndex: 1,
-        timeElapsedSec: 2,
-        historyLogs: [
-          ...prev.historyLogs,
-          {
-            timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-            event: '⚡ POD DEPLOYER DOOR RELEASE SIGNAL FIRED (SPRING EJECTION ACTIVATED)',
-            state: 'RELEASE_TRIGGERED',
-            type: 'info'
-          }
-        ]
-      }));
-
-      // Step 2 -> Awaiting Separation Confirmation (start 15s timer)
-      setTimeout(() => {
-        setDeployment(prev => ({
-          ...prev,
-          currentStateIndex: 2,
-          timeElapsedSec: 5,
-          historyLogs: [
-            ...prev.historyLogs,
-            {
-              timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-              event: '📡 AWAITING SEPARATION SWITCH CONFIRMATION & FIRST RF BEACON...',
-              state: 'SEPARATION_CONFIRMED',
-              type: 'info'
-            }
-          ]
-        }));
-      }, 3000);
-    }, 2000);
-  };
-
-  const transitionDeploymentState = async (nextIndex) => {
-    await api.transitionDeployment(nextIndex);
-    setDeployment(prev => ({
-      ...prev,
-      currentStateIndex: nextIndex,
-      contingencyActive: false,
-      contingencyMessage: '',
-      historyLogs: [
-        ...prev.historyLogs,
-        {
-          timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-          event: `OPERATOR TRANSITIONED STATE TO: ${prev.states[nextIndex]?.label}`,
-          state: prev.states[nextIndex]?.id,
-          type: 'info'
-        }
-      ]
-    }));
-  };
-
-  const triggerContingency = (reason) => {
-    setDeployment(prev => ({
-      ...prev,
-      contingencyActive: true,
-      contingencyMessage: reason || 'DEPLOYMENT SIGNAL ACKNOWLEDGEMENT TIMEOUT EXCEEDED (>15s). NO SEPARATION BEACON RECEIVED.',
-      historyLogs: [
-        ...prev.historyLogs,
-        {
-          timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-          event: `⚠️ CONTINGENCY ALERT: ${reason || 'SIGNAL TIMEOUT — SATELLITE SEPARATION UNCONFIRMED'}`,
-          state: prev.states[prev.currentStateIndex]?.id,
-          type: 'warning'
-        }
-      ]
-    }));
-  };
-
-  const resolveContingencyAction = async (action) => {
-    await api.resolveContingency(action);
-    setDeployment(prev => {
-      let nextIdx = prev.currentStateIndex;
-      let logMsg = '';
-      if (action === 'FORCE_CONFIRM') {
-        nextIdx = 3; // Move to Initialization
-        logMsg = '✅ OPERATOR MANUALLY MARKED SEPARATION CONFIRMED — RESUMING BUS BOOT SEQUENCE';
-      } else if (action === 'RETRY') {
-        logMsg = '🔄 RETRYING TELEMETRY SWEEP FOR SEPARATION RF BEACON...';
-      } else {
-        logMsg = '🚨 CONTINGENCY ESCALATED TO MISSION DIRECTOR FOR TRAJECTORY ANALYSIS';
-      }
-
-      return {
-        ...prev,
-        currentStateIndex: nextIdx,
-        contingencyActive: false,
-        contingencyMessage: '',
-        historyLogs: [
-          ...prev.historyLogs,
-          {
-            timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-            event: logMsg,
-            state: prev.states[nextIdx]?.id,
-            type: action === 'FORCE_CONFIRM' ? 'success' : 'info'
-          }
-        ]
-      };
-    });
-
-    // If force confirmed, automatically progress to Initialization -> Commissioning -> Operational
-    if (action === 'FORCE_CONFIRM') {
-      setTimeout(() => {
-        setDeployment(prev => ({
-          ...prev,
-          currentStateIndex: 4, // Commissioning
-          historyLogs: [
-            ...prev.historyLogs,
-            {
-              timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-              event: '🛰️ INITIALIZATION COMPLETE — SUBSYSTEM COMMISSIONING ENGAGED (EPS, ADCS, TT&C OK)',
-              state: 'COMMISSIONING',
-              type: 'info'
-            }
-          ]
-        }));
-
-        setTimeout(() => {
-          setDeployment(prev => ({
-            ...prev,
-            currentStateIndex: 5, // Operational
-            historyLogs: [
-              ...prev.historyLogs,
-              {
-                timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-                event: '🎉 MISSION HANDOVER COMPLETE — SATELLITE IS FULLY OPERATIONAL IN ORBIT',
-                state: 'OPERATIONAL',
-                type: 'success'
-              }
-            ]
-          }));
-        }, 4000);
-      }, 3000);
-    }
-  };
-
-  // Settings update
   const saveRouterSettings = async (newSettings) => {
-    await api.updateSettings(newSettings);
     setSettings(newSettings);
+    setQueue(prevQueue => computePriorityQueue(prevQueue, telemetry, newSettings));
+    try {
+      localStorage.setItem('arbiter_router_settings', JSON.stringify(newSettings));
+    } catch (e) {}
   };
 
   return (
@@ -370,6 +241,18 @@ export const TelemetryProvider = ({ children }) => {
         scenarios,
         validationRuns,
         deployment,
+        inspectState,
+        clearInspection,
+        runLaunchSequenceDemo,
+        runTimeoutContingency,
+        retryVerification,
+        checkSecondaryBeacon,
+        escalateContingency,
+        manualConfirmSeparation,
+        startDeploymentSequence: runLaunchSequenceDemo,
+        transitionDeploymentState,
+        triggerContingency,
+        resolveContingencyAction,
         settings,
         isPolling,
         setIsPolling,
@@ -377,10 +260,6 @@ export const TelemetryProvider = ({ children }) => {
         issueOverride,
         runScenarioTest,
         addScenario,
-        startDeploymentSequence,
-        transitionDeploymentState,
-        triggerContingency,
-        resolveContingencyAction,
         saveRouterSettings
       }}
     >
