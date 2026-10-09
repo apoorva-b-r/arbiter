@@ -4,6 +4,9 @@
  */
 
 const router = require('./router');
+const { isDbConnected } = require('../db');
+const Decision = require('../models/Decision');
+const Pass = require('../models/Pass');
 
 let currentTelemetry = {
   battery: 84.5,
@@ -37,6 +40,7 @@ let passes = [
     decisions: [
       {
         id: 'DEC-809',
+        decisionId: 'DEC-809',
         timestamp: '12:15:42',
         selectedType: 'TTC',
         reasoning: 'SAFETY OVERRIDE: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
@@ -46,6 +50,7 @@ let passes = [
       },
       {
         id: 'DEC-808',
+        decisionId: 'DEC-808',
         timestamp: '12:14:30',
         selectedType: 'SSTV',
         reasoning: 'SSTV selected: High link quality (92%) allows efficient transfer of 450KB frame. Priority score 215 exceeded candidates.',
@@ -55,6 +60,7 @@ let passes = [
       },
       {
         id: 'DEC-807',
+        decisionId: 'DEC-807',
         timestamp: '12:13:15',
         selectedType: 'M17',
         reasoning: 'OPERATOR OVERRIDE: Ground station engineer manually commanded M17 transmission.',
@@ -77,6 +83,7 @@ let passes = [
     decisions: [
       {
         id: 'DEC-706',
+        decisionId: 'DEC-706',
         timestamp: '10:41:00',
         selectedType: 'TTC',
         reasoning: 'TTC selected: Housekeeping beacon dispatched prior to pass loss of signal. Priority score 310.',
@@ -86,6 +93,7 @@ let passes = [
       },
       {
         id: 'DEC-705',
+        decisionId: 'DEC-705',
         timestamp: '10:39:10',
         selectedType: 'SSTV',
         reasoning: 'SSTV selected: Image frame payload transmitted at peak SNR 19.5 dB.',
@@ -119,6 +127,50 @@ function startSimulator() {
     if (currentTelemetry.passTimeRemainingSec > 0) {
       currentTelemetry.passTimeRemainingSec -= 3;
     } else {
+      // Pass finished! Complete active pass and save to DB
+      const activePass = passes.find(p => p.passId === currentTelemetry.currentPassId);
+      if (activePass) {
+        activePass.status = 'COMPLETED';
+        activePass.endTime = new Date().toTimeString().substring(0, 8) + ' UTC';
+        activePass.itemsSent = (activePass.decisions || []).length;
+        activePass.overrideCount = (activePass.decisions || []).filter(d => d.isOverridden).length;
+
+        // Save completed pass to MongoDB if connected
+        if (isDbConnected()) {
+          Pass.create({
+            passId: activePass.passId,
+            date: activePass.date,
+            startTime: activePass.startTime,
+            endTime: activePass.endTime,
+            durationSec: activePass.durationSec || 600,
+            itemsSent: activePass.itemsSent,
+            overrideCount: activePass.overrideCount,
+            status: 'COMPLETED',
+            peakLinkQuality: activePass.peakLinkQuality || 90,
+            avgBattery: activePass.avgBattery || 85
+          }).catch(err => console.error('[DB ERROR] Failed to save completed pass:', err.message));
+        }
+      }
+
+      // Start new pass
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10);
+      const timeStr = now.toTimeString().substring(0, 8) + ' UTC';
+      const newPassId = `PASS-${dateStr.replace(/-/g, '')}-${(passes.length + 1).toString().padStart(2, '0')}`;
+      
+      const newPass = {
+        passId: newPassId,
+        date: dateStr,
+        startTime: timeStr,
+        endTime: 'Active',
+        durationSec: 600,
+        status: 'ACTIVE',
+        peakLinkQuality: currentTelemetry.linkQuality,
+        avgBattery: currentTelemetry.battery,
+        decisions: []
+      };
+      passes.unshift(newPass);
+      currentTelemetry.currentPassId = newPassId;
       currentTelemetry.passTimeRemainingSec = 600;
     }
 
@@ -149,6 +201,38 @@ function startSimulator() {
     const decision = router.makeDecision(queueItems, currentTelemetry);
     currentTelemetry.activeMode = decision.selectedType;
 
+    const decId = `DEC-${Date.now().toString().slice(-4)}`;
+    const newDec = {
+      id: decId,
+      decisionId: decId,
+      timestamp: timeStr,
+      selectedType: decision.selectedType,
+      reasoning: decision.reasoning,
+      isOverridden: false,
+      passId: currentTelemetry.currentPassId,
+      score: decision.score || 0
+    };
+
+    decisionLog.unshift(newDec);
+    const activePass = passes.find(p => p.passId === currentTelemetry.currentPassId);
+    if (activePass) {
+      if (!activePass.decisions) activePass.decisions = [];
+      activePass.decisions.unshift(newDec);
+    }
+
+    // Fire-and-forget save auto decision to MongoDB if connected
+    if (isDbConnected()) {
+      Decision.create({
+        decisionId: newDec.decisionId,
+        timestamp: newDec.timestamp,
+        selectedType: newDec.selectedType,
+        reasoning: newDec.reasoning,
+        isOverridden: false,
+        passId: newDec.passId,
+        score: newDec.score
+      }).catch(err => console.error('[DB ERROR] Failed to save auto decision:', err.message));
+    }
+
   }, 3000);
 }
 
@@ -160,9 +244,10 @@ function getPasses() { return passes; }
 
 function applyOverride(mode) {
   currentTelemetry.activeMode = mode;
+  const decId = `DEC-${Date.now().toString().slice(-4)}`;
   const newDec = {
-    id: `DEC-${Date.now().toString().slice(-4)}`,
-    decisionId: `DEC-${Date.now().toString().slice(-4)}`,
+    id: decId,
+    decisionId: decId,
     timestamp: new Date().toTimeString().substring(0, 8),
     selectedType: mode,
     reasoning: `OPERATOR OVERRIDE: Ground station engineer commanded direct transmission of ${mode}. Router automated selection bypassed.`,
@@ -177,7 +262,27 @@ function applyOverride(mode) {
     if (!activePass.decisions) activePass.decisions = [];
     activePass.decisions.unshift(newDec);
   }
+
+  // Fire-and-forget save override decision to MongoDB if connected
+  if (isDbConnected()) {
+    Decision.create({
+      decisionId: newDec.decisionId,
+      timestamp: newDec.timestamp,
+      selectedType: newDec.selectedType,
+      reasoning: newDec.reasoning,
+      isOverridden: true,
+      overriddenType: mode,
+      passId: newDec.passId,
+      score: 0
+    }).catch(err => console.error('[DB ERROR] Failed to save override decision:', err.message));
+  }
+
   return newDec;
+}
+
+function deletePass(passId) {
+  passes = passes.filter(p => p.passId !== passId);
+  decisionLog = decisionLog.filter(d => d.passId !== passId);
 }
 
 module.exports = {
@@ -187,5 +292,6 @@ module.exports = {
   getQueue,
   getDecisions,
   getPasses,
-  applyOverride
+  applyOverride,
+  deletePass
 };
