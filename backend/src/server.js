@@ -1,9 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+
 
 const simulator = require('./services/simulator');
 
@@ -41,12 +43,12 @@ app.get('/api/health', (req, res) => {
 // Database connection with fallback
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/arbiter';
 
-mongoose.connect(MONGO_URI)
+mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 8000 })
   .then(() => {
-    console.log('[DB] MongoDB Connection Established Successfully.');
+    console.log(`[DB] MongoDB Connection Established Successfully to ${mongoose.connection.host}`);
   })
   .catch(err => {
-    console.warn('[DB WARNING] Could not connect to local MongoDB. Falling back to In-Memory Simulator Data layer.');
+    console.warn(`[DB WARNING] Could not connect to local MongoDB (${err.message}). Falling back to In-Memory Simulator Data layer.`);
   });
 
 // Start simulator loop
