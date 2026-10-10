@@ -2,18 +2,26 @@ import React, { useState } from 'react';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useTelemetry } from '../context/TelemetryContext';
 import { api } from '../api/client';
-import { History, Eye, X, CheckCircle2, UserCheck, Calendar, Clock, Loader2 } from 'lucide-react';
+import { History, Eye, X, CheckCircle2, UserCheck, Calendar, Clock, Loader2, Edit3, Save } from 'lucide-react';
 
 export const PassHistory = () => {
-  const { passes } = useTelemetry();
+  const { passes, backendOnline } = useTelemetry();
   const [selectedPass, setSelectedPass] = useState(null);
   const [modalDecisions, setModalDecisions] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
+
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesText, setNotesText] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesError, setNotesError] = useState('');
 
   const handleInspectLogs = async (pass) => {
     setSelectedPass(pass);
     setModalLoading(true);
     setModalDecisions([]);
+    setEditingNotes(false);
+    setNotesText(pass.operatorNotes || '');
+    setNotesError('');
 
     try {
       const detail = await api.getPassDetail(pass.passId);
@@ -23,6 +31,9 @@ export const PassHistory = () => {
         setModalDecisions(pass.decisions);
       } else {
         setModalDecisions([]);
+      }
+      if (detail && detail.operatorNotes !== undefined) {
+        setNotesText(detail.operatorNotes);
       }
     } catch (err) {
       console.warn('Failed to fetch pass detail, falling back to pass data:', err);
@@ -152,6 +163,95 @@ export const PassHistory = () => {
                     {overrideCount} ({overridePct}%)
                   </span>
                 </div>
+              </div>
+
+              {/* Operator Notes Section */}
+              <div className="operator-notes-box">
+                <div className="notes-header">
+                  <span className="modal-section-title" style={{ margin: 0 }}>
+                    Operator Notes
+                  </span>
+                  {!editingNotes ? (
+                    <button
+                      onClick={() => {
+                        setNotesText(selectedPass.operatorNotes || '');
+                        setEditingNotes(true);
+                      }}
+                      disabled={!backendOnline}
+                      title={!backendOnline ? 'Backend offline' : ''}
+                      className="btn btn-outline btn-sm edit-notes-btn"
+                    >
+                      <Edit3 size={13} /> Edit note
+                    </button>
+                  ) : null}
+                </div>
+
+                {editingNotes ? (
+                  <div className="notes-edit-form">
+                    <textarea
+                      value={notesText}
+                      onChange={(e) => {
+                        if (e.target.value.length <= 500) {
+                          setNotesText(e.target.value);
+                          setNotesError('');
+                        }
+                      }}
+                      placeholder="Add observations, anomaly logs, or operator notes for this ground pass (max 500 characters)..."
+                      rows={3}
+                      className="notes-textarea"
+                    />
+                    <div className="notes-edit-actions">
+                      <span className="mono text-xs text-muted">
+                        {notesText.length}/500
+                      </span>
+                      {notesError && <span className="mono text-xs text-danger">{notesError}</span>}
+                      <div className="notes-buttons">
+                        <button
+                          onClick={() => {
+                            setEditingNotes(false);
+                            setNotesError('');
+                          }}
+                          className="btn btn-outline btn-sm"
+                          disabled={notesSaving}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (notesText.length > 500) {
+                              setNotesError('Notes cannot exceed 500 characters.');
+                              return;
+                            }
+                            setNotesSaving(true);
+                            try {
+                              const updated = await api.updatePassNotes(selectedPass.passId, notesText);
+                              const newNotes = updated.operatorNotes !== undefined ? updated.operatorNotes : notesText;
+                              setSelectedPass(prev => ({ ...prev, operatorNotes: newNotes }));
+                              selectedPass.operatorNotes = newNotes;
+                              setEditingNotes(false);
+                            } catch (err) {
+                              setNotesError(err.message || 'Failed to save notes.');
+                            } finally {
+                              setNotesSaving(false);
+                            }
+                          }}
+                          className="btn btn-primary btn-sm"
+                          disabled={notesSaving}
+                        >
+                          {notesSaving ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="notes-display-text text-sm">
+                    {selectedPass.operatorNotes ? (
+                      selectedPass.operatorNotes
+                    ) : (
+                      <span className="text-muted italic">No operator notes recorded for this pass.</span>
+                    )}
+                  </p>
+                )}
               </div>
 
               <h4 className="modal-section-title">Decision Timeline Log</h4>
@@ -373,6 +473,71 @@ export const PassHistory = () => {
           background-color: var(--color-soft-blush);
           border-radius: 8px;
           border: 1px dashed var(--border-color);
+        }
+
+        .operator-notes-box {
+          background-color: #FFF9FA;
+          border: 1px solid var(--border-color);
+          border-radius: 10px;
+          padding: 0.8rem 1rem;
+          margin-bottom: 1rem;
+        }
+
+        .notes-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.4rem;
+        }
+
+        .edit-notes-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          padding: 0.25rem 0.6rem;
+          font-size: 0.75rem;
+        }
+
+        .notes-display-text {
+          font-size: 0.85rem;
+          color: var(--text-primary);
+          line-height: 1.4;
+          margin: 0;
+        }
+
+        .notes-edit-form {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .notes-textarea {
+          width: 100%;
+          padding: 0.6rem 0.8rem;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          background-color: #ffffff;
+          font-size: 0.85rem;
+          color: var(--text-primary);
+          resize: vertical;
+          font-family: inherit;
+          box-sizing: border-box;
+        }
+
+        .notes-textarea:focus {
+          outline: none;
+          border-color: var(--color-berry-rose);
+        }
+
+        .notes-edit-actions {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .notes-buttons {
+          display: flex;
+          gap: 0.5rem;
         }
       `}</style>
     </PageContainer>

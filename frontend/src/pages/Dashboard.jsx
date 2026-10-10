@@ -5,12 +5,34 @@ import { TelemetryChart } from '../components/dashboard/TelemetryChart';
 import { QueuePanel } from '../components/dashboard/QueuePanel';
 import { DecisionLog } from '../components/dashboard/DecisionLog';
 import { OverridePanel } from '../components/dashboard/OverridePanel';
+import { useTelemetry } from '../context/TelemetryContext';
 
 export const Dashboard = () => {
+  const { isPolling, setIsPolling, lastUpdated } = useTelemetry();
+
+  const formattedTime = lastUpdated && !isNaN(new Date(lastUpdated).getTime())
+    ? new Date(lastUpdated).toLocaleTimeString('en-GB', { hour12: false })
+    : '--:--:--';
+
+  const actions = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+      <span className="mono" style={{ fontSize: '0.8rem', color: isPolling ? 'var(--color-soft-blush)' : 'var(--text-muted)' }}>
+        {isPolling ? `Last updated: ${formattedTime}` : 'Paused'}
+      </span>
+      <button
+        onClick={() => setIsPolling(!isPolling)}
+        className={`btn btn-sm ${isPolling ? 'btn-outline' : 'btn-primary'}`}
+      >
+        {isPolling ? '⏸ Pause live feed' : '▶ Resume live feed'}
+      </button>
+    </div>
+  );
+
   return (
     <PageContainer
       title="ARBITER GROUND STATION DASHBOARD"
       subtitle="Real-time PocketQube telemetry, AI priority router telemetry queue, and operator override controls"
+      actions={actions}
     >
       <div className="dashboard-grid">
         {/* Top 3 Status Cards */}

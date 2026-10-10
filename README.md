@@ -40,23 +40,41 @@ arbiter/
 
 ---
 
-## Quickstart Guide
+## How to Run
 
-### 1. Frontend Setup & Launch
+### 1. Prerequisites
+- **Node.js**: Version 18+ installed
+
+### 2. Environment Configuration
+- Get `backend/.env` from the team lead (refer to `backend/.env.example` for the key format).
+- Copy `frontend/.env.example` to `frontend/.env` (or configure `VITE_API_URL`).
+
+### 3. Installation
+Install root and all workspace dependencies:
 ```bash
-cd frontend
-npm install
+npm run install:all
+```
+
+### 4. Database Seeding (Optional / Team Lead Only)
+Seed MongoDB with historical pass records and baseline telemetry decisions:
+```bash
+npm run seed
+```
+*(Note: Only the team lead should run this as it resets shared database history).*
+
+### 5. Launch Application
+Start both Express backend server and React Vite frontend concurrently:
+```bash
 npm run dev
 ```
-The frontend will launch locally on **`http://localhost:3000`**.
+- **Frontend**: Accessible at `http://localhost:3000` (or `http://localhost:5173`)
+- **Backend API**: Running on `http://localhost:5001/api`
 
-### 2. Backend Setup & Launch
-```bash
-cd backend
-npm install
-npm run dev
-```
-The Express backend server will start on **`http://localhost:5001`**.
+### 6. Operator Login Credentials
+- **Username**: `Operator-Alpha`
+- **Password**: `Arbiter2026!`
+
+> **Note**: If the Express backend is offline or unreachable, the frontend automatically falls back to **`SIMULATION MODE`** using client-side mock telemetry and local fallback scheduling.
 
 ---
 

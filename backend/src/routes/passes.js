@@ -90,4 +90,48 @@ router.delete('/:passId', async (req, res) => {
   }
 });
 
+// PATCH /api/passes/:passId/notes -> update operator notes
+router.patch('/:passId/notes', async (req, res) => {
+  try {
+    const { passId } = req.params;
+    const { notes } = req.body;
+
+    const notesStr = notes !== undefined && notes !== null ? String(notes) : '';
+
+    if (notesStr.length > 500) {
+      return res.status(400).json({ error: 'Operator notes cannot exceed 500 characters.' });
+    }
+
+    let updatedPass = null;
+
+    if (isDbConnected()) {
+      updatedPass = await Pass.findOneAndUpdate(
+        { passId },
+        { $set: { operatorNotes: notesStr } },
+        { new: true }
+      ).lean();
+    }
+
+    const inMemPass = simulator.getPasses().find(p => p.passId === passId);
+    if (inMemPass) {
+      inMemPass.operatorNotes = notesStr;
+      if (!updatedPass) {
+        updatedPass = inMemPass;
+      }
+    }
+
+    if (!updatedPass) {
+      return res.status(404).json({ error: 'Pass not found.' });
+    }
+
+    return res.status(200).json({
+      ...updatedPass,
+      id: updatedPass.passId
+    });
+  } catch (err) {
+    console.error('Error updating pass notes:', err);
+    return res.status(500).json({ error: 'Failed to update pass notes.' });
+  }
+});
+
 module.exports = router;

@@ -10,7 +10,8 @@ const PassSchema = new mongoose.Schema({
   overrideCount: { type: Number, default: 0 },
   status: { type: String, enum: ['ACTIVE', 'COMPLETED'], default: 'ACTIVE' },
   peakLinkQuality: { type: Number, default: 90 },
-  avgBattery: { type: Number, default: 85 }
+  avgBattery: { type: Number, default: 85 },
+  operatorNotes: { type: String, maxlength: 500, default: '' }
 });
 
 module.exports = mongoose.model('Pass', PassSchema);

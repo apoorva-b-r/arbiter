@@ -71,11 +71,12 @@ function makeDecision(queueItems, telemetry) {
   );
 
   if (starvedTtc) {
+    const realScore = calculateScore(starvedTtc, telemetry);
     return {
       selectedType: 'TTC',
       reasoning: `STARVATION SAFEGUARD: TT&C beacon has been waiting ${starvedTtc.waitTimeSec}s, exceeding the ${currentSettings.ttcStarvationTimeoutSec}s starvation limit. Priority forced regardless of candidate scores.`,
       isOverridden: false,
-      score: 999
+      score: realScore
     };
   }
 

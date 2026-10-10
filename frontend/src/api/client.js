@@ -124,6 +124,14 @@ export const api = {
     });
   },
 
+  updatePassNotes: async (passId, notes) => {
+    const data = await request(`/passes/${passId}/notes`, {
+      method: 'PATCH',
+      body: JSON.stringify({ notes })
+    });
+    return mapPass(data);
+  },
+
   // Operator Override API
   sendOverride: async (mode) => {
     return withFallback(async () => {

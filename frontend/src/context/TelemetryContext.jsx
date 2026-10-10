@@ -116,6 +116,13 @@ export const TelemetryProvider = ({ children }) => {
   const [isPolling, setIsPolling] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
+  const queueRef = React.useRef(queue);
+  queueRef.current = queue;
+  const telemetryRef = React.useRef(telemetry);
+  telemetryRef.current = telemetry;
+  const historyRef = React.useRef(telemetryHistory);
+  historyRef.current = telemetryHistory;
+
   // Automatically update queue scoring and sorting whenever settings change
   useEffect(() => {
     setQueue(prevQueue => computePriorityQueue(prevQueue, telemetry, settings));
@@ -140,90 +147,91 @@ export const TelemetryProvider = ({ children }) => {
 
   // Real-time telemetry simulation fluctuation for live visual demo fallback
   const simulateLiveTick = () => {
-    let nextTelemetry = telemetry;
-    setTelemetry(prev => {
-      const linkDelta = Math.floor(Math.random() * 7) - 3;
-      const newLink = Math.max(20, Math.min(100, prev.linkQuality + linkDelta));
-      
-      const batDelta = (prev.activeMode === 'SSTV' ? -0.3 : -0.1) + 0.05;
-      const newBat = Math.max(15, Math.min(100, Math.round((prev.battery + batDelta) * 10) / 10));
+    // 1. Calculate next telemetry state (OUTSIDE updaters)
+    const currentTel = telemetryRef.current;
+    const linkDelta = Math.floor(Math.random() * 7) - 3;
+    const newLink = Math.max(20, Math.min(100, currentTel.linkQuality + linkDelta));
+    const batDelta = (currentTel.activeMode === 'SSTV' ? -0.3 : -0.1) + 0.05;
+    const newBat = Math.max(15, Math.min(100, Math.round((currentTel.battery + batDelta) * 10) / 10));
+    const newSnr = Math.round((newLink / 5) * 10) / 10;
 
-      const newSnr = Math.round((newLink / 5) * 10) / 10;
+    const nextTelemetry = {
+      ...currentTel,
+      battery: newBat,
+      linkQuality: newLink,
+      snr: newSnr
+    };
 
-      const nowStr = new Date().toTimeString().substring(0, 8);
-      setTelemetryHistory(h => [
-        ...h.slice(1),
-        { time: nowStr, battery: newBat, linkQuality: newLink, snr: newSnr }
-      ]);
+    const now = new Date();
+    const nowStr = now.toTimeString().substring(0, 8);
 
-      nextTelemetry = {
-        ...prev,
-        battery: newBat,
-        linkQuality: newLink,
-        snr: newSnr
-      };
-      return nextTelemetry;
-    });
+    const updatedHistory = [
+      ...historyRef.current.slice(1),
+      { time: nowStr, battery: newBat, linkQuality: newLink, snr: newSnr }
+    ];
 
-    setQueue(prevQueue => {
-      const scoredQueue = computePriorityQueue(prevQueue, nextTelemetry, settings);
-      let remainingQueue = [...scoredQueue];
+    // 2. Calculate next queue state & decision object (OUTSIDE updaters)
+    const currentQueue = queueRef.current;
+    const scoredQueue = computePriorityQueue(currentQueue, nextTelemetry, settings);
+    let remainingQueue = [...scoredQueue];
 
-      // Remove top dispatched item
-      const dispatched = remainingQueue.shift();
+    // Remove top dispatched item
+    const dispatched = remainingQueue.shift();
 
-      // Increment wait time for remaining items
-      remainingQueue = remainingQueue.map(item => ({
-        ...item,
-        waitTimeSec: item.waitTimeSec + 3
-      }));
+    // Increment wait time for remaining items
+    remainingQueue = remainingQueue.map(item => ({
+      ...item,
+      waitTimeSec: item.waitTimeSec + 3
+    }));
 
-      // Add new incoming item to keep queue between 3 and 8 items
-      if (remainingQueue.length < 3 || (remainingQueue.length < 8 && Math.random() < 0.4)) {
-        const templates = [
-          { type: 'TTC', label: 'Periodic Housekeeping Beacon', sizeKb: 14, baseWeight: 100 },
-          { type: 'SSTV', label: 'High-Res Earth Observation Frame', sizeKb: 480, baseWeight: 60 },
-          { type: 'Codec2', label: 'Compressed Digital Voice Stream', sizeKb: 32, baseWeight: 40 },
-          { type: 'M17', label: 'Telemetry Packet Batch', sizeKb: 110, baseWeight: 30 }
-        ];
-        const tmpl = templates[Math.floor(Math.random() * templates.length)];
-        const newItemId = `Q-${Math.floor(100 + Math.random() * 900)}`;
-        remainingQueue.push({
-          id: newItemId,
-          itemId: newItemId,
-          type: tmpl.type,
-          label: tmpl.label,
-          sizeKb: tmpl.sizeKb,
-          waitTimeSec: 0,
-          baseWeight: tmpl.baseWeight,
-          priorityScore: tmpl.baseWeight,
-          status: 'PENDING',
-          isStarved: false
-        });
-      }
+    // Add new incoming item to keep queue between 3 and 8 items
+    if (remainingQueue.length < 3 || (remainingQueue.length < 8 && Math.random() < 0.4)) {
+      const templates = [
+        { type: 'TTC', label: 'Periodic Housekeeping Beacon', sizeKb: 14, baseWeight: 100 },
+        { type: 'SSTV', label: 'High-Res Earth Observation Frame', sizeKb: 480, baseWeight: 60 },
+        { type: 'Codec2', label: 'Compressed Digital Voice Stream', sizeKb: 32, baseWeight: 40 },
+        { type: 'M17', label: 'Telemetry Packet Batch', sizeKb: 110, baseWeight: 30 }
+      ];
+      const tmpl = templates[Math.floor(Math.random() * templates.length)];
+      const newItemId = `Q-${Math.floor(100 + Math.random() * 900)}`;
+      remainingQueue.push({
+        id: newItemId,
+        itemId: newItemId,
+        type: tmpl.type,
+        label: tmpl.label,
+        sizeKb: tmpl.sizeKb,
+        waitTimeSec: 0,
+        baseWeight: tmpl.baseWeight,
+        priorityScore: tmpl.baseWeight,
+        status: 'PENDING',
+        isStarved: false
+      });
+    }
 
-      // Add local fallback decision in SIMULATION MODE
-      const now = new Date();
-      const dispatchedType = dispatched ? dispatched.type : 'TTC';
-      const dispatchedScore = dispatched ? dispatched.priorityScore : 100;
-      const localDec = {
-        id: `DEC-${now.getTime().toString().slice(-4)}`,
-        decisionId: `DEC-${now.getTime().toString().slice(-4)}`,
-        timestamp: now.toTimeString().substring(0, 8),
-        createdAt: now.toISOString(),
-        selectedType: dispatchedType,
-        reasoning: `${dispatchedType} selected: Priority score ${dispatchedScore} dispatched from transmission queue.`,
-        isOverridden: false,
-        passId: nextTelemetry.currentPassId,
-        score: dispatchedScore
-      };
+    const finalQueue = computePriorityQueue(remainingQueue, nextTelemetry, settings);
 
-      setDecisions(prev => processDecisions([localDec, ...prev]).slice(0, 20));
+    // Build local decision object
+    const dispatchedType = dispatched ? dispatched.type : 'TTC';
+    const dispatchedScore = dispatched ? dispatched.priorityScore : 100;
+    const decId = `DEC-${now.getTime().toString().slice(-4)}`;
+    const localDec = {
+      id: decId,
+      decisionId: decId,
+      timestamp: nowStr,
+      createdAt: now.toISOString(),
+      selectedType: dispatchedType,
+      reasoning: `${dispatchedType} selected: Priority score ${dispatchedScore} dispatched from transmission queue.`,
+      isOverridden: false,
+      passId: nextTelemetry.currentPassId,
+      score: dispatchedScore
+    };
 
-      return computePriorityQueue(remainingQueue, nextTelemetry, settings);
-    });
-
-    setLastUpdated(new Date());
+    // 3. Dispatch plain state setters with pre-calculated objects
+    setTelemetry(nextTelemetry);
+    setTelemetryHistory(updatedHistory);
+    setQueue(finalQueue);
+    setDecisions(prev => processDecisions([localDec, ...prev]).slice(0, 20));
+    setLastUpdated(now);
   };
 
   // Initial load of pass history, scenarios, and validation runs from backend with fallback
