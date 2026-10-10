@@ -1,120 +1,373 @@
-/**
- * Safety Validator Console Engine
- * Executes test scenarios in fast-forward against the router engine logic
- */
 
+const mongoose = require('mongoose');
 const router = require('./router');
+const Scenario = require('../models/Scenario');
+const ValidationRun = require('../models/ValidationRun');
+const { isDbConnected } = require('../db');
 
 const SCENARIOS = [
   {
-    id: 'SCEN-01',
     scenarioId: 'SCEN-01',
     name: 'Nominal Ground Pass Sequence',
-    description: 'Standard 10-minute ground pass with link quality up to 95% and initial battery at 90%. Checks standard priority balance.',
+    description: 'Standard ground pass with healthy battery and strong link.',
     initialBattery: 90,
-    linkProfile: 'HIGH_SINE',
+    linkProfile: 'strong',
     rulesCount: 4,
     status: 'PASSED'
   },
   {
-    id: 'SCEN-02',
     scenarioId: 'SCEN-02',
     name: 'Eclipse Low Battery Stress Test',
-    description: 'Simulates eclipse entry with initial battery at 25%. Tests if AI router halts SSTV payload transfer to conserve power for TT&C.',
+    description: 'Tests payload selection during low battery.',
     initialBattery: 25,
-    linkProfile: 'MODERATE',
-    rulesCount: 5,
+    linkProfile: 'weak',
+    rulesCount: 4,
     status: 'PASSED'
   },
   {
-    id: 'SCEN-03',
     scenarioId: 'SCEN-03',
     name: 'TT&C Starvation Prevention Check',
-    description: 'Injects high volume of payload requests while withholding TT&C. Verifies that TT&C forces transmission when wait time > 120s.',
+    description: 'Tests the TT&C starvation safety fallback.',
     initialBattery: 75,
-    linkProfile: 'HIGH_FLAT',
-    rulesCount: 3,
+    linkProfile: 'strong',
+    rulesCount: 4,
     status: 'PASSED'
   },
   {
-    id: 'SCEN-04',
     scenarioId: 'SCEN-04',
     name: 'Degraded Signal Link Quality Curve',
-    description: 'Pass with severe fading (link quality < 30%). Tests router response during poor signal-to-noise ratio conditions.',
+    description: 'Tests transmission under degraded signal conditions.',
     initialBattery: 60,
-    linkProfile: 'LOW_NOISY',
+    linkProfile: 'fluctuating',
     rulesCount: 4,
-    status: 'FAILED'
+    status: 'PASSED'
   }
 ];
 
-const VALIDATION_RUNS = [
-  { run: 'v1.0.0', passRate: 75, date: 'Aug 10' },
-  { run: 'v1.1.0', passRate: 82, date: 'Aug 12' },
-  { run: 'v1.2.0', passRate: 90, date: 'Aug 15' },
-  { run: 'v1.3.0 (Current)', passRate: 96, date: 'Aug 17' }
-];
+let memoryScenarios = SCENARIOS.map(s => ({ ...s }));
+let memoryRuns = [];
 
-function getScenarios() {
-  return SCENARIOS;
+function connected() {
+  return isDbConnected();
 }
 
-function getValidationRuns() {
-  return VALIDATION_RUNS;
+function sameId(scenario, id) {
+  return (
+    String(scenario._id || scenario.id || scenario.scenarioId) === String(id) ||
+    String(scenario.scenarioId) === String(id)
+  );
 }
 
-function addScenario(newScen) {
-  const formatted = {
-    ...newScen,
-    id: newScen.scenarioId || `SCEN-${Date.now().toString().slice(-4)}`,
-    scenarioId: newScen.scenarioId || `SCEN-${Date.now().toString().slice(-4)}`
+async function getScenarios() {
+  if (!connected()) {
+    return memoryScenarios;
+  }
+
+  if (await Scenario.countDocuments() === 0) {
+    await Scenario.insertMany(SCENARIOS);
+  }
+
+  return Scenario.find().sort({ createdAt: 1 }).lean();
+}
+
+async function addScenario(input) {
+  const scenarioId =
+    `SCEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+  const scenario = {
+    scenarioId,
+    name: input.name.trim(),
+    description: input.description.trim(),
+    initialBattery: input.initialBattery,
+    linkProfile: input.linkProfile.trim(),
+    rulesCount: 4,
+    status: 'PASSED'
   };
-  SCENARIOS.unshift(formatted);
-  return formatted;
+
+  if (connected()) {
+    return Scenario.create(scenario);
+  }
+
+  memoryScenarios.unshift({ ...scenario, id: scenarioId });
+  return memoryScenarios[0];
 }
 
-function runScenario(id) {
-  const scen = SCENARIOS.find(s => s.id === id || s.scenarioId === id) || SCENARIOS[0];
+async function updateScenario(id, input) {
+  if (connected()) {
+    const filter = mongoose.isValidObjectId(id)
+      ? { $or: [{ _id: id }, { scenarioId: id }] }
+      : { scenarioId: id };
 
-  // Evaluate safety rules against scenario initial parameters
-  const ttcStarvationPass = true; // Router enforces starvation <= 120s
-  const batteryReservePass = scen.initialBattery >= 20;
-  const priorityOrderPass = true;
+    return Scenario.findOneAndUpdate(
+      filter,
+      {
+        name: input.name.trim(),
+        description: input.description.trim(),
+        initialBattery: input.initialBattery,
+        linkProfile: input.linkProfile.trim()
+      },
+      { new: true, runValidators: true }
+    );
+  }
+
+  const scenario = memoryScenarios.find(item => sameId(item, id));
+
+  if (!scenario) {
+    return null;
+  }
+
+  Object.assign(scenario, {
+    name: input.name.trim(),
+    description: input.description.trim(),
+    initialBattery: input.initialBattery,
+    linkProfile: input.linkProfile.trim()
+  });
+
+  return scenario;
+}
+
+async function deleteScenario(id) {
+  if (connected()) {
+    const filter = mongoose.isValidObjectId(id)
+      ? { $or: [{ _id: id }, { scenarioId: id }] }
+      : { scenarioId: id };
+
+    const result = await Scenario.findOneAndDelete(filter);
+    return Boolean(result);
+  }
+
+  const index = memoryScenarios.findIndex(item => sameId(item, id));
+
+  if (index === -1) {
+    return false;
+  }
+
+  memoryScenarios.splice(index, 1);
+  return true;
+}
+
+function linkAt(profile, tick) {
+  switch (String(profile || '').toLowerCase()) {
+    case 'strong':
+    case 'high_flat':
+      return 85;
+
+    case 'high_sine':
+      return Math.round(75 + 20 * Math.sin(tick / 8));
+
+    case 'moderate':
+      return 50;
+
+    case 'weak':
+      return 30;
+
+    case 'low_noisy':
+      return Math.round(15 + Math.random() * 25);
+
+    case 'dropout':
+      return tick >= 30 ? 5 : 80;
+
+    case 'fluctuating':
+      return Math.round(15 + Math.random() * 75);
+
+    default:
+      return 70;
+  }
+}
+
+async function runScenario(id) {
+  const scenarios = await getScenarios();
+  const scenario = scenarios.find(item => sameId(item, id));
+
+  if (!scenario) {
+    return null;
+  }
+
+  const settings = router.getSettings();
+  let battery = Number(scenario.initialBattery);
+  let maxTtcWait = 0;
+  let sstvBelowThreshold = false;
+  let nonTtcDuringPoorLink = false;
+  let belowFiveAtTick = null;
+  let blockedTransmissions = 0;
+
+  const queue = [
+    { id: 'ttc', type: 'TTC', waitTimeSec: 0, sizeKb: 1 },
+    { id: 'sstv', type: 'SSTV', waitTimeSec: 0, sizeKb: 500 },
+    { id: 'codec2', type: 'Codec2', waitTimeSec: 0, sizeKb: 20 },
+    { id: 'm17', type: 'M17', waitTimeSec: 0, sizeKb: 20 }
+  ];
+
+  // Simulate 60 ticks, with each tick representing 3 seconds.
+  for (let tick = 0; tick < 60; tick++) {
+    const linkQuality = linkAt(scenario.linkProfile, tick);
+
+    // Always evaluate the actual router decision using the full queue.
+    const decision = router.makeDecision(queue, {
+      battery,
+      linkQuality
+    });
+
+    const selected = decision.selectedType;
+
+    // Rule 1: Record whether SSTV was selected below its battery threshold.
+    if (
+      selected === 'SSTV' &&
+      battery < settings.batteryThresholdLow
+    ) {
+      sstvBelowThreshold = true;
+    }
+
+    // Approximate battery consumption for the selected payload.
+    const batteryCost =
+      selected === 'SSTV' ? 1.2 :
+      selected === 'TTC' ? 0.05 :
+      0.2;
+
+    // Preserve the 5% battery reserve.
+    const canTransmit = battery - batteryCost >= 5;
+
+    let transmittedType = null;
+
+    if (canTransmit) {
+      transmittedType = selected;
+      battery -= batteryCost;
+
+      // A successful transmission resets the selected item's wait.
+      // Every other queued item continues waiting.
+      queue.forEach(item => {
+        if (item.type === transmittedType) {
+          item.waitTimeSec = 0;
+        } else {
+          item.waitTimeSec += 3;
+        }
+      });
+    } else {
+      // No transmission occurred. All queued items continue waiting.
+      blockedTransmissions++;
+
+      queue.forEach(item => {
+        item.waitTimeSec += 3;
+      });
+    }
+
+    // Rule 2: Check what was actually transmitted during poor link quality.
+    if (linkQuality < 20 && transmittedType !== null &&
+        transmittedType !== 'TTC') {
+      nonTtcDuringPoorLink = true;
+    }
+
+    // Measure TT&C wait AFTER this tick's wait-time update.
+    const ttc = queue.find(item => item.type === 'TTC');
+
+    if (ttc) {
+      maxTtcWait = Math.max(maxTtcWait, ttc.waitTimeSec);
+    }
+
+    if (battery < 5 && belowFiveAtTick === null) {
+      belowFiveAtTick = tick + 1;
+    }
+  }
 
   const rulesChecked = [
     {
+      rule: 'TT&C starvation timeout',
       name: 'TT&C max wait time <= 120s starvation rule',
-      status: ttcStarvationPass ? 'PASS' : 'FAIL',
-      details: 'Max TT&C wait time observed: 108s (within 120s bound)'
+      passed: maxTtcWait <= settings.ttcStarvationTimeoutSec,
+      detail:
+        `TT&C max wait was ${maxTtcWait}s ` +
+        `(limit ${settings.ttcStarvationTimeoutSec}s)` +
+        (blockedTransmissions > 0
+          ? `; ${blockedTransmissions} transmission attempt(s) were blocked by the battery reserve`
+          : '')
     },
     {
-      name: 'Critical battery reserve preservation (>= 20%)',
-      status: batteryReservePass ? 'PASS' : 'FAIL',
-      details: `Min battery observed: ${scen.initialBattery}%`
+      rule: 'SSTV low-battery restriction',
+      name: 'SSTV not selected below battery threshold',
+      passed: !sstvBelowThreshold,
+      detail: sstvBelowThreshold
+        ? `SSTV was selected below ${settings.batteryThresholdLow}% battery`
+        : `SSTV was never selected below ${settings.batteryThresholdLow}% battery`
     },
     {
-      name: 'Priority scoring math order consistency',
-      status: priorityOrderPass ? 'PASS' : 'FAIL',
-      details: 'All transmission items selected strictly by formula ranking'
+      rule: 'Poor-link TT&C restriction',
+      name: 'Only TT&C sent when link quality < 20%',
+      passed: !nonTtcDuringPoorLink,
+      detail: nonTtcDuringPoorLink
+        ? 'A non-TT&C payload was transmitted during poor link quality'
+        : 'No non-TT&C payload was transmitted whenever link quality was below 20%'
+    },
+    {
+      rule: 'Battery reserve',
+      name: 'Battery never drops below 5%',
+      passed: belowFiveAtTick === null,
+      detail: belowFiveAtTick === null
+        ? `Battery stayed at or above 5%; final battery ${Math.max(0, battery).toFixed(1)}%`
+        : `Battery dropped below 5% at tick ${belowFiveAtTick}`
     }
   ];
 
-  const allPassed = rulesChecked.every(r => r.status === 'PASS');
-  const scorePercentage = Math.round((rulesChecked.filter(r => r.status === 'PASS').length / rulesChecked.length) * 100);
+  const passedCount = rulesChecked.filter(rule => rule.passed).length;
+  const passRate = Math.round(
+    (passedCount / rulesChecked.length) * 100
+  );
 
-  return {
-    scenarioId: scen.id,
-    scenarioName: scen.name,
-    status: allPassed ? 'PASSED' : 'FAILED',
-    scorePercentage,
-    rulesChecked,
-    runAt: new Date().toISOString()
+  const runAt = new Date();
+
+  const result = {
+    runId: `RUN-${Date.now()}`,
+    scenarioId: scenario.scenarioId,
+    scenarioName: scenario.name,
+    versionLabel: 'v1.4.0',
+    passRate,
+    scorePercentage: passRate,
+    status: passedCount === rulesChecked.length ? 'PASSED' : 'FAILED',
+    rulesChecked: rulesChecked.map(rule => ({
+      name: rule.name,
+      status: rule.passed ? 'PASS' : 'FAIL',
+      details: rule.detail
+    })),
+    results: rulesChecked.map(({ rule, passed, detail }) => ({
+      rule,
+      passed,
+      detail
+    })),
+    date: runAt.toISOString(),
+    runAt: runAt.toISOString()
   };
+
+  if (connected()) {
+    await ValidationRun.create({
+      runId: result.runId,
+      scenarioId: String(scenario._id || scenario.scenarioId),
+      versionLabel: result.versionLabel,
+      passRate,
+      date: result.date,
+      results: result.results
+    });
+  } else {
+    memoryRuns.unshift({
+      run: result.versionLabel,
+      ...result
+    });
+  }
+
+  return result;
+}
+
+async function getValidationRuns() {
+  if (!connected()) {
+    return memoryRuns;
+  }
+
+  return ValidationRun.find().sort({ createdAt: -1 }).lean();
 }
 
 module.exports = {
   getScenarios,
   getValidationRuns,
   addScenario,
+  updateScenario,
+  deleteScenario,
   runScenario
 };

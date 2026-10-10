@@ -34,6 +34,7 @@ app.use('/api/passes', passRoutes);
 app.use('/api/validation', validationRoutes);
 app.use('/api/deployment', deploymentRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/auth', require('./routes/auth'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
