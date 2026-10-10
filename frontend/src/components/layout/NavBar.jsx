@@ -73,7 +73,7 @@ export const NavBar = () => {
       <div className="navbar-status">
         {/* Backend Online / Simulation Badge */}
         <div className={`backend-status-badge ${backendOnline ? 'online' : 'offline'}`}>
-          <span className="status-dot">●</span>
+          <span className="status-dot"></span>
           <span>{backendOnline ? 'LIVE BACKEND' : 'SIMULATION MODE'}</span>
         </div>
 
@@ -175,9 +175,9 @@ export const NavBar = () => {
         }
 
         .backend-status-badge {
-          display: flex;
+          display: inline-flex;
           align-items: center;
-          gap: 0.4rem;
+          gap: 8px;
           padding: 0.35rem 0.75rem;
           border-radius: 999px;
           font-size: 0.75rem;
@@ -199,7 +199,22 @@ export const NavBar = () => {
         }
 
         .status-dot {
-          font-size: 0.65rem;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background-color: currentColor;
+          display: inline-block;
+          flex-shrink: 0;
+          animation: statusDotPulse 1.6s infinite ease-in-out;
+        }
+
+        @keyframes statusDotPulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.4;
+          }
         }
 
         .pass-status-badge {

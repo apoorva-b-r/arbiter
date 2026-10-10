@@ -57,7 +57,8 @@ export async function withFallback(apiCall, mockValue) {
 // Data shape mappers to guarantee consistency with mockData.js
 const mapDecision = (d) => ({
   ...d,
-  id: d.id || d.decisionId || d._id
+  id: d.id || d.decisionId || d._id,
+  isOverridden: Boolean(d.isOverridden)
 });
 
 const mapPass = (p) => ({
@@ -95,8 +96,12 @@ export const api = {
   },
 
   // Decisions API
-  getDecisions: async () => {
-    const data = await request('/decisions');
+  getDecisions: async (passId, limit) => {
+    const params = new URLSearchParams();
+    if (passId) params.append('passId', passId);
+    if (limit) params.append('limit', limit);
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    const data = await request(`/decisions${queryString}`);
     return Array.isArray(data) ? data.map(mapDecision) : [];
   },
 

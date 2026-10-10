@@ -173,7 +173,7 @@ export const TelemetryProvider = ({ children }) => {
           api.getTelemetry(),
           api.getTelemetryHistory(),
           api.getQueue(),
-          api.getDecisions()
+          api.getDecisions(telemetry.currentPassId, 20)
         ]);
 
         if (telData) {
@@ -258,7 +258,7 @@ export const TelemetryProvider = ({ children }) => {
       try {
         const [qData, dData] = await Promise.all([
           api.getQueue(),
-          api.getDecisions()
+          api.getDecisions(telemetry.currentPassId, 20)
         ]);
         if (Array.isArray(qData)) {
           setQueue(computePriorityQueue(qData, { ...telemetry, activeMode: mode }, settings));

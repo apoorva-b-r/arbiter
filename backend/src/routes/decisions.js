@@ -8,7 +8,7 @@ const { isDbConnected } = require('../db');
 router.get('/', async (req, res) => {
   try {
     const { passId, limit } = req.query;
-    const maxLimit = parseInt(limit, 10) || 50;
+    const maxLimit = limit ? parseInt(limit, 10) : 20;
 
     if (isDbConnected()) {
       const filter = {};
@@ -31,9 +31,7 @@ router.get('/', async (req, res) => {
     if (passId) {
       inMemDecisions = inMemDecisions.filter(d => d.passId === passId);
     }
-    if (limit) {
-      inMemDecisions = inMemDecisions.slice(0, maxLimit);
-    }
+    inMemDecisions = inMemDecisions.slice(0, maxLimit);
 
     return res.status(200).json(inMemDecisions);
   } catch (err) {

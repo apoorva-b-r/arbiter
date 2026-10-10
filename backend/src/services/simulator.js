@@ -63,11 +63,10 @@ let passes = [
         decisionId: 'DEC-807',
         timestamp: '12:13:15',
         selectedType: 'M17',
-        reasoning: 'OPERATOR OVERRIDE: Ground station engineer manually commanded M17 transmission.',
-        isOverridden: true,
-        overriddenType: 'M17',
+        reasoning: 'M17 selected: Digital voice packet batch dispatched based on queue weight calculation.',
+        isOverridden: false,
         passId: 'PASS-20260817-09',
-        score: 0
+        score: 180
       }
     ]
   },
