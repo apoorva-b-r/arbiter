@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export const NavBar = () => {
-  const { user, logout, telemetry } = useTelemetry();
+  const { user, logout, telemetry, backendOnline } = useTelemetry();
   const navigate = useNavigate();
   const [utcTime, setUtcTime] = useState('');
 
@@ -71,6 +71,11 @@ export const NavBar = () => {
       </nav>
 
       <div className="navbar-status">
+        {/* Backend Online / Simulation Badge */}
+        <div className={`backend-status-badge ${backendOnline ? 'online' : 'offline'}`}>
+          <span className="status-dot">●</span>
+          <span>{backendOnline ? 'LIVE BACKEND' : 'SIMULATION MODE'}</span>
+        </div>
 
         {/* User Operator Info */}
         <div className="operator-badge">
@@ -167,6 +172,34 @@ export const NavBar = () => {
           display: flex;
           align-items: center;
           gap: 1rem;
+        }
+
+        .backend-status-badge {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.35rem 0.75rem;
+          border-radius: 999px;
+          font-size: 0.75rem;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+        }
+
+        .backend-status-badge.online {
+          background-color: rgba(34, 197, 94, 0.15);
+          border: 1px solid rgba(34, 197, 94, 0.4);
+          color: #4ade80;
+        }
+
+        .backend-status-badge.offline {
+          background-color: rgba(245, 158, 11, 0.15);
+          border: 1px solid rgba(245, 158, 11, 0.4);
+          color: #fbbf24;
+        }
+
+        .status-dot {
+          font-size: 0.65rem;
         }
 
         .pass-status-badge {

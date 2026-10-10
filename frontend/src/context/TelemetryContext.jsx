@@ -60,6 +60,9 @@ export const TelemetryProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // Backend connection status state
+  const [backendOnline, setBackendOnline] = useState(false);
+
   // Global Mission Data State
   const [telemetry, setTelemetry] = useState(MOCK_TELEMETRY);
   const [telemetryHistory, setTelemetryHistory] = useState(MOCK_TELEMETRY_HISTORY);
@@ -103,7 +106,7 @@ export const TelemetryProvider = ({ children }) => {
     resolveContingencyAction
   } = deploymentStateHook;
 
-  // Real-time telemetry simulation fluctuation for live visual demo
+  // Real-time telemetry simulation fluctuation for live visual demo fallback
   const simulateLiveTick = () => {
     let nextTelemetry = telemetry;
     setTelemetry(prev => {
@@ -141,33 +144,105 @@ export const TelemetryProvider = ({ children }) => {
     setLastUpdated(new Date());
   };
 
+  // Initial load of pass history, scenarios, and validation runs from backend with fallback
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [fetchedPasses, fetchedScenarios, fetchedRuns] = await Promise.all([
+          api.getPasses(),
+          api.getScenarios(),
+          api.getValidationRuns()
+        ]);
+        if (Array.isArray(fetchedPasses)) setPasses(fetchedPasses);
+        if (Array.isArray(fetchedScenarios)) setScenarios(fetchedScenarios);
+        if (Array.isArray(fetchedRuns)) setValidationRuns(fetchedRuns);
+      } catch (err) {
+        console.warn('[TelemetryContext] Initial fetch warning:', err);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  // Polling loop (every 3s): try backend live data first, fallback to simulateLiveTick() if backend is offline
   useEffect(() => {
     if (!isPolling) return;
-    const interval = setInterval(simulateLiveTick, 3000);
+
+    const pollBackendOrSimulate = async () => {
+      try {
+        const [telData, histData, queueData, decData] = await Promise.all([
+          api.getTelemetry(),
+          api.getTelemetryHistory(),
+          api.getQueue(),
+          api.getDecisions()
+        ]);
+
+        if (telData) {
+          setTelemetry(telData);
+        }
+        if (Array.isArray(histData) && histData.length > 0) {
+          setTelemetryHistory(histData);
+        }
+        if (Array.isArray(queueData)) {
+          setQueue(computePriorityQueue(queueData, telData || telemetry, settings));
+        }
+        if (Array.isArray(decData)) {
+          setDecisions(decData);
+        }
+        setLastUpdated(new Date());
+        setBackendOnline(true);
+      } catch (err) {
+        simulateLiveTick();
+        setBackendOnline(false);
+      }
+    };
+
+    pollBackendOrSimulate();
+    const interval = setInterval(pollBackendOrSimulate, 3000);
     return () => clearInterval(interval);
   }, [isPolling, settings]);
 
   // Auth methods
-  const login = (username, password) => {
-    const validUsername = 'Operator-Alpha';
-    const validPassword = 'Arbiter2026!';
+  const login = async (username, password) => {
+    const trimmedUsername = username.trim();
 
-    const usernameOk = username.trim() === validUsername;
-    const passwordOk = password === validPassword;
+    try {
+      const res = await api.login(trimmedUsername, password);
+      // Backend returned 200 OK
+      const userData = (res && res.user) ? res.user : {
+        username: (res && res.username) || trimmedUsername,
+        token: (res && res.token) || `token-${Date.now()}`
+      };
 
-    if (!usernameOk || !passwordOk) {
-      return { ok: false, usernameOk, passwordOk };
+      setUser(userData);
+      localStorage.setItem('arbiter_user', JSON.stringify(userData));
+      return { ok: true, usernameOk: true, passwordOk: true };
+    } catch (err) {
+      // 401 Unauthorized -> invalid credentials error
+      if (err && err.status === 401) {
+        return { ok: false, usernameOk: true, passwordOk: false };
+      }
+
+      // 404 Route Not Found or Network error -> fallback to local credential check
+      const validUsername = 'Operator-Alpha';
+      const validPassword = 'Arbiter2026!';
+
+      const usernameOk = trimmedUsername === validUsername;
+      const passwordOk = password === validPassword;
+
+      if (!usernameOk || !passwordOk) {
+        return { ok: false, usernameOk, passwordOk };
+      }
+
+      const userData = {
+        username: validUsername,
+        token: `token-${Date.now()}`
+      };
+
+      setUser(userData);
+      localStorage.setItem('arbiter_user', JSON.stringify(userData));
+
+      return { ok: true, usernameOk: true, passwordOk: true };
     }
-
-    const userData = {
-      username: validUsername,
-      token: `token-${Date.now()}`
-    };
-
-    setUser(userData);
-    localStorage.setItem('arbiter_user', JSON.stringify(userData));
-
-    return { ok: true, usernameOk: true, passwordOk: true };
   };
 
   const logout = () => {
@@ -177,46 +252,69 @@ export const TelemetryProvider = ({ children }) => {
 
   const issueOverride = async (mode) => {
     try {
-      await api.sendOverride(mode);
-      
+      const res = await api.sendOverride(mode);
       setTelemetry(t => ({ ...t, activeMode: mode }));
 
-      const newDecision = {
-        id: `DEC-${Date.now().toString().slice(-4)}`,
-        timestamp: new Date().toTimeString().substring(0, 8),
-        selectedType: mode,
-        reasoning: `OPERATOR OVERRIDE: Ground station engineer commanded direct transmission of ${mode}. Router automated selection bypassed.`,
-        isOverridden: true,
-        overriddenType: mode,
-        passId: telemetry.currentPassId,
-        score: 0
-      };
+      try {
+        const [qData, dData] = await Promise.all([
+          api.getQueue(),
+          api.getDecisions()
+        ]);
+        if (Array.isArray(qData)) {
+          setQueue(computePriorityQueue(qData, { ...telemetry, activeMode: mode }, settings));
+        }
+        if (Array.isArray(dData)) {
+          setDecisions(dData);
+        }
+      } catch (refreshErr) {
+        const newDecision = (res && res.decision) ? res.decision : {
+          id: `DEC-${Date.now().toString().slice(-4)}`,
+          timestamp: new Date().toTimeString().substring(0, 8),
+          selectedType: mode,
+          reasoning: `OPERATOR OVERRIDE: Ground station engineer commanded direct transmission of ${mode}. Router automated selection bypassed.`,
+          isOverridden: true,
+          overriddenType: mode,
+          passId: telemetry.currentPassId,
+          score: 0
+        };
 
-      setDecisions(prev => [newDecision, ...prev]);
-      
-      setPasses(prev =>
-        prev.map(p =>
-          p.passId === telemetry.currentPassId
-            ? { ...p, decisions: [newDecision, ...(p.decisions || [])] }
-            : p
-        )
-      );
+        setDecisions(prev => [newDecision, ...prev]);
+        setPasses(prev =>
+          prev.map(p =>
+            p.passId === telemetry.currentPassId
+              ? { ...p, decisions: [newDecision, ...(p.decisions || [])] }
+              : p
+          )
+        );
+      }
     } catch (err) {
       console.error('Failed to issue override:', err);
     }
   };
 
   const runScenarioTest = async (scenarioId) => {
-    const res = await api.runScenario(scenarioId);
-    return res;
+    try {
+      const res = await api.runScenario(scenarioId);
+      return res;
+    } catch (err) {
+      console.error('Failed to run scenario test:', err);
+      return null;
+    }
   };
 
   const addScenario = async (newScenario) => {
-    const res = await api.createScenario(newScenario);
-    if (res && res.scenario) {
-      setScenarios(prev => [res.scenario, ...prev]);
+    try {
+      const res = await api.addScenario(newScenario);
+      if (res && res.scenario) {
+        setScenarios(prev => [res.scenario, ...prev]);
+      }
+      return res;
+    } catch (err) {
+      console.error('Failed to add scenario:', err);
+      const fallbackScen = { ...newScenario, id: `SCEN-${Date.now()}` };
+      setScenarios(prev => [fallbackScen, ...prev]);
+      return { success: true, scenario: fallbackScen };
     }
-    return res;
   };
 
   const saveRouterSettings = async (newSettings) => {
@@ -233,6 +331,7 @@ export const TelemetryProvider = ({ children }) => {
         user,
         login,
         logout,
+        backendOnline,
         telemetry,
         telemetryHistory,
         queue,

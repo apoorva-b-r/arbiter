@@ -11,7 +11,7 @@ export const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({ username: '', password: '' });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const nextErrors = { username: '', password: '' };
@@ -29,7 +29,7 @@ export const Login = () => {
       return;
     }
 
-    const result = login(username, password);
+    const result = await login(username, password);
 
     if (result.ok) {
       setErrors({ username: '', password: '' });
