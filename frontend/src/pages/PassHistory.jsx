@@ -4,6 +4,26 @@ import { useTelemetry } from '../context/TelemetryContext';
 import { api } from '../api/client';
 import { History, Eye, X, CheckCircle2, UserCheck, Calendar, Clock, Loader2, Edit3, Save } from 'lucide-react';
 
+const formatPassTime = (createdAt, timeStr, dateStr) => {
+  if (createdAt) {
+    const d = new Date(createdAt);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString('en-GB', { hour12: false });
+    }
+  }
+  if (timeStr) {
+    const cleanTime = String(timeStr).replace(' UTC', '').trim();
+    if (dateStr) {
+      const d = new Date(`${dateStr}T${cleanTime}Z`);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString('en-GB', { hour12: false });
+      }
+    }
+    return cleanTime;
+  }
+  return '';
+};
+
 export const PassHistory = () => {
   const { passes, backendOnline } = useTelemetry();
   const [selectedPass, setSelectedPass] = useState(null);
@@ -93,7 +113,7 @@ export const PassHistory = () => {
                   <td className="mono bold">{pass.passId}</td>
                   <td>
                     <div className="cell-with-sub">
-                      <span>{pass.startTime}</span>
+                      <span>{formatPassTime(pass.createdAt, pass.startTime, pass.date)}</span>
                       <span className="text-muted text-xs mono">{pass.date}</span>
                     </div>
                   </td>
@@ -151,7 +171,7 @@ export const PassHistory = () => {
               <div className="pass-summary-grid">
                 <div className="pass-metric">
                   <span className="metric-label">START TIME</span>
-                  <span className="metric-val mono">{selectedPass.startTime}</span>
+                  <span className="metric-val mono">{formatPassTime(selectedPass.createdAt, selectedPass.startTime, selectedPass.date)}</span>
                 </div>
                 <div className="pass-metric">
                   <span className="metric-label">TOTAL DISPATCHED</span>
@@ -267,9 +287,7 @@ export const PassHistory = () => {
                         const isOverridden = dec.isOverridden || dec.wasOverride;
                         const itemType = dec.selectedType || dec.itemType || 'DATA';
                         const reasoning = dec.reasoning || dec.reason;
-                        const displayTime = dec.createdAt && !isNaN(new Date(dec.createdAt).getTime())
-                          ? new Date(dec.createdAt).toLocaleTimeString('en-GB', { hour12: false })
-                          : dec.timestamp;
+                        const displayTime = formatPassTime(dec.createdAt, dec.timestamp, selectedPass?.date);
 
                         return (
                           <div key={dec.id || dec.decisionId || dec._id} className={`decision-card ${isOverridden ? 'override-card' : ''}`}>
