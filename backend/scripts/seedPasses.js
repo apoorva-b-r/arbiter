@@ -14,7 +14,7 @@ const TYPES = ['TTC', 'SSTV', 'Codec2', 'M17'];
 const DECISION_REASONS = {
   TTC: [
     'TTC selected: High priority base weight (100) enforced for critical satellite health telemetry.',
-    'SAFETY OVERRIDE: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
+    'STARVATION SAFEGUARD: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
     'TTC selected: Periodic beacon ping scheduled prior to pass loss of signal.'
   ],
   SSTV: [
@@ -59,7 +59,7 @@ async function seed() {
     const endHour = parseInt(startMin, 10) + 10 >= 60 ? (parseInt(startHour, 10) + 1) % 24 : startHour;
     const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}:00 UTC`;
 
-    const passId = `PASS-${dateStr.replace(/-/g, '')}-${(16 - i).toString().padStart(2, '0')}`;
+    const passId = `PASS-${dateStr.replace(/-/g, '')}-${startHour}${startMin}00`;
     const peakLinkQuality = Math.floor(82 + Math.random() * 16);
     const avgBattery = Math.round((78 + Math.random() * 16) * 10) / 10;
     const status = i === 1 ? 'ACTIVE' : 'COMPLETED';
@@ -70,13 +70,25 @@ async function seed() {
     for (let d = numDecisions; d >= 1; d--) {
       const decId = `DEC-${1000 + i * 20 + d}`;
       const isOverride = Math.random() < 0.15; // ~15% chance of manual override
-      const selectedType = TYPES[Math.floor(Math.random() * TYPES.length)];
+      const isStarvationSafeguard = !isOverride && Math.random() < 0.125; // ~1 in 8 chance
+
+      let selectedType = TYPES[Math.floor(Math.random() * TYPES.length)];
+      if (isStarvationSafeguard) {
+        selectedType = 'TTC';
+      }
+
       if (isOverride) overrideCount++;
 
-      const reasonList = DECISION_REASONS[selectedType] || DECISION_REASONS.TTC;
-      let reasoning = isOverride
-        ? `OPERATOR OVERRIDE: Ground station engineer commanded direct transmission of ${selectedType}.`
-        : reasonList[Math.floor(Math.random() * reasonList.length)];
+      let reasoning;
+      if (isOverride) {
+        reasoning = `OPERATOR OVERRIDE: Ground station engineer commanded direct transmission of ${selectedType}.`;
+      } else if (isStarvationSafeguard) {
+        const waitTime = Math.floor(125 + Math.random() * 30);
+        reasoning = `STARVATION SAFEGUARD: TT&C has waited ${waitTime}s, exceeding the 120s limit. Forced to top priority regardless of other scores.`;
+      } else {
+        const reasonList = DECISION_REASONS[selectedType] || DECISION_REASONS.TTC;
+        reasoning = reasonList[Math.floor(Math.random() * reasonList.length)];
+      }
 
       const decMin = (parseInt(startMin, 10) + Math.floor((d / numDecisions) * 9)) % 60;
       const decSec = Math.floor(Math.random() * 60).toString().padStart(2, '0');
@@ -90,7 +102,7 @@ async function seed() {
         isOverridden: isOverride,
         overriddenType: isOverride ? selectedType : undefined,
         passId,
-        score: isOverride ? 0 : Math.floor(120 + Math.random() * 220),
+        score: isOverride ? 0 : (isStarvationSafeguard ? 999 : Math.floor(120 + Math.random() * 220)),
         createdAt: new Date(passDateObj.getTime() + d * 60000)
       });
     }

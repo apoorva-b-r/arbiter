@@ -58,6 +58,7 @@ export async function withFallback(apiCall, mockValue) {
 const mapDecision = (d) => ({
   ...d,
   id: d.id || d.decisionId || d._id,
+  createdAt: d.createdAt || null,
   isOverridden: Boolean(d.isOverridden)
 });
 

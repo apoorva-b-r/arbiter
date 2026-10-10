@@ -85,7 +85,7 @@ export const MOCK_PASS_HISTORY = [
         id: 'DEC-809',
         timestamp: '12:15:42',
         selectedType: 'TTC',
-        reasoning: 'SAFETY OVERRIDE: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
+        reasoning: 'STARVATION SAFEGUARD: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
         isOverridden: false,
         passId: 'PASS-20260817-09',
         score: 345
@@ -192,7 +192,7 @@ export const MOCK_PASS_HISTORY = [
         id: 'DEC-604',
         timestamp: '09:00:15',
         selectedType: 'TTC',
-        reasoning: 'SAFETY OVERRIDE: TT&C wait time (128s) exceeded 120s starvation threshold. High priority dispatch forced.',
+        reasoning: 'STARVATION SAFEGUARD: TT&C wait time (128s) exceeded 120s starvation threshold. High priority dispatch forced.',
         isOverridden: false,
         passId: 'PASS-20260817-07',
         score: 350

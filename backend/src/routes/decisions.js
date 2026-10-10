@@ -31,6 +31,13 @@ router.get('/', async (req, res) => {
     if (passId) {
       inMemDecisions = inMemDecisions.filter(d => d.passId === passId);
     }
+
+    inMemDecisions.sort((a, b) => {
+      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tB - tA;
+    });
+
     inMemDecisions = inMemDecisions.slice(0, maxLimit);
 
     return res.status(200).json(inMemDecisions);

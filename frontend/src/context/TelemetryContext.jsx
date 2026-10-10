@@ -31,10 +31,10 @@ export const calculatePriorityScore = (item, telemetry, routerSettings) => {
 
   const roundedScore = Math.round(score);
 
-  // Check Safety Override Constraint: TT&C wait time >= ttcStarvationTimeoutSec
+  // Check Starvation Safeguard Constraint: TT&C wait time >= ttcStarvationTimeoutSec
   const isStarved = item.type === 'TTC' && item.waitTimeSec >= ttcTimeout;
 
-  // Starvation forces TT&C to top priority by adding high override score bonus
+  // Starvation forces TT&C to top priority by adding high bonus
   const finalScore = isStarved ? roundedScore + 10000 : roundedScore;
 
   return {
@@ -49,6 +49,38 @@ export const computePriorityQueue = (rawQueue, telemetry, routerSettings) => {
   return rawQueue
     .map(item => calculatePriorityScore(item, telemetry, routerSettings))
     .sort((a, b) => b.priorityScore - a.priorityScore);
+};
+
+// Date extraction helper for sorting
+export const getDecisionDate = (d) => {
+  if (d?.createdAt) {
+    const parsed = new Date(d.createdAt).getTime();
+    if (!isNaN(parsed)) return parsed;
+  }
+  if (d?.timestamp) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const parsed = new Date(`${todayStr}T${d.timestamp}Z`).getTime();
+    if (!isNaN(parsed)) return parsed;
+  }
+  return 0;
+};
+
+// Sort newest first helper
+export const sortNewestFirst = (decisionsList) => {
+  const list = Array.isArray(decisionsList) ? decisionsList : [];
+  return [...list].sort((a, b) => getDecisionDate(b) - getDecisionDate(a));
+};
+
+// De-duplicate by decision ID and sort newest first
+export const processDecisions = (decisionsList) => {
+  const sorted = sortNewestFirst(decisionsList);
+  const seen = new Set();
+  return sorted.filter(item => {
+    const id = item.id || item.decisionId || item._id;
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 };
 
 const TelemetryContext = createContext(null);
@@ -77,7 +109,7 @@ export const TelemetryProvider = ({ children }) => {
   });
 
   const [queue, setQueue] = useState(() => computePriorityQueue(MOCK_QUEUE, MOCK_TELEMETRY, settings));
-  const [decisions, setDecisions] = useState(MOCK_DECISIONS);
+  const [decisions, setDecisions] = useState(() => processDecisions(MOCK_DECISIONS));
   const [passes, setPasses] = useState(MOCK_PASS_HISTORY);
   const [scenarios, setScenarios] = useState(MOCK_SCENARIOS);
   const [validationRuns, setValidationRuns] = useState(MOCK_VALIDATION_RUNS);
@@ -134,11 +166,61 @@ export const TelemetryProvider = ({ children }) => {
     });
 
     setQueue(prevQueue => {
-      const tickedQueue = prevQueue.map(item => ({
+      const scoredQueue = computePriorityQueue(prevQueue, nextTelemetry, settings);
+      let remainingQueue = [...scoredQueue];
+
+      // Remove top dispatched item
+      const dispatched = remainingQueue.shift();
+
+      // Increment wait time for remaining items
+      remainingQueue = remainingQueue.map(item => ({
         ...item,
         waitTimeSec: item.waitTimeSec + 3
       }));
-      return computePriorityQueue(tickedQueue, nextTelemetry, settings);
+
+      // Add new incoming item to keep queue between 3 and 8 items
+      if (remainingQueue.length < 3 || (remainingQueue.length < 8 && Math.random() < 0.4)) {
+        const templates = [
+          { type: 'TTC', label: 'Periodic Housekeeping Beacon', sizeKb: 14, baseWeight: 100 },
+          { type: 'SSTV', label: 'High-Res Earth Observation Frame', sizeKb: 480, baseWeight: 60 },
+          { type: 'Codec2', label: 'Compressed Digital Voice Stream', sizeKb: 32, baseWeight: 40 },
+          { type: 'M17', label: 'Telemetry Packet Batch', sizeKb: 110, baseWeight: 30 }
+        ];
+        const tmpl = templates[Math.floor(Math.random() * templates.length)];
+        const newItemId = `Q-${Math.floor(100 + Math.random() * 900)}`;
+        remainingQueue.push({
+          id: newItemId,
+          itemId: newItemId,
+          type: tmpl.type,
+          label: tmpl.label,
+          sizeKb: tmpl.sizeKb,
+          waitTimeSec: 0,
+          baseWeight: tmpl.baseWeight,
+          priorityScore: tmpl.baseWeight,
+          status: 'PENDING',
+          isStarved: false
+        });
+      }
+
+      // Add local fallback decision in SIMULATION MODE
+      const now = new Date();
+      const dispatchedType = dispatched ? dispatched.type : 'TTC';
+      const dispatchedScore = dispatched ? dispatched.priorityScore : 100;
+      const localDec = {
+        id: `DEC-${now.getTime().toString().slice(-4)}`,
+        decisionId: `DEC-${now.getTime().toString().slice(-4)}`,
+        timestamp: now.toTimeString().substring(0, 8),
+        createdAt: now.toISOString(),
+        selectedType: dispatchedType,
+        reasoning: `${dispatchedType} selected: Priority score ${dispatchedScore} dispatched from transmission queue.`,
+        isOverridden: false,
+        passId: nextTelemetry.currentPassId,
+        score: dispatchedScore
+      };
+
+      setDecisions(prev => processDecisions([localDec, ...prev]).slice(0, 20));
+
+      return computePriorityQueue(remainingQueue, nextTelemetry, settings);
     });
 
     setLastUpdated(new Date());
@@ -186,7 +268,7 @@ export const TelemetryProvider = ({ children }) => {
           setQueue(computePriorityQueue(queueData, telData || telemetry, settings));
         }
         if (Array.isArray(decData)) {
-          setDecisions(decData);
+          setDecisions(processDecisions(decData));
         }
         setLastUpdated(new Date());
         setBackendOnline(true);
@@ -264,12 +346,16 @@ export const TelemetryProvider = ({ children }) => {
           setQueue(computePriorityQueue(qData, { ...telemetry, activeMode: mode }, settings));
         }
         if (Array.isArray(dData)) {
-          setDecisions(dData);
+          // ONLINE PATH: Do NOT add decision locally. Only set decisions returned from backend fetch!
+          setDecisions(processDecisions(dData));
         }
       } catch (refreshErr) {
-        const newDecision = (res && res.decision) ? res.decision : {
-          id: `DEC-${Date.now().toString().slice(-4)}`,
-          timestamp: new Date().toTimeString().substring(0, 8),
+        const now = new Date();
+        const localOverride = (res && res.decision) ? res.decision : {
+          id: `DEC-${now.getTime().toString().slice(-4)}`,
+          decisionId: `DEC-${now.getTime().toString().slice(-4)}`,
+          timestamp: now.toTimeString().substring(0, 8),
+          createdAt: now.toISOString(),
           selectedType: mode,
           reasoning: `OPERATOR OVERRIDE: Ground station engineer commanded direct transmission of ${mode}. Router automated selection bypassed.`,
           isOverridden: true,
@@ -278,17 +364,34 @@ export const TelemetryProvider = ({ children }) => {
           score: 0
         };
 
-        setDecisions(prev => [newDecision, ...prev]);
-        setPasses(prev =>
-          prev.map(p =>
-            p.passId === telemetry.currentPassId
-              ? { ...p, decisions: [newDecision, ...(p.decisions || [])] }
-              : p
-          )
-        );
+        setDecisions(prev => processDecisions([localOverride, ...prev]).slice(0, 20));
+        setQueue(prevQueue => {
+          const rem = prevQueue.filter(item => item.type !== mode);
+          return computePriorityQueue(rem, { ...telemetry, activeMode: mode }, settings);
+        });
       }
     } catch (err) {
       console.error('Failed to issue override:', err);
+      // OFFLINE PATH: Add local override decision immediately
+      const now = new Date();
+      const localOverride = {
+        id: `DEC-${now.getTime().toString().slice(-4)}`,
+        decisionId: `DEC-${now.getTime().toString().slice(-4)}`,
+        timestamp: now.toTimeString().substring(0, 8),
+        createdAt: now.toISOString(),
+        selectedType: mode,
+        reasoning: `OPERATOR OVERRIDE: Ground station engineer commanded direct transmission of ${mode}. Router automated selection bypassed.`,
+        isOverridden: true,
+        overriddenType: mode,
+        passId: telemetry.currentPassId,
+        score: 0
+      };
+
+      setDecisions(prev => processDecisions([localOverride, ...prev]).slice(0, 20));
+      setQueue(prevQueue => {
+        const rem = prevQueue.filter(item => item.type !== mode);
+        return computePriorityQueue(rem, { ...telemetry, activeMode: mode }, settings);
+      });
     }
   };
 

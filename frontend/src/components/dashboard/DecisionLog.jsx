@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTelemetry } from '../../context/TelemetryContext';
-import { Cpu, UserCheck, CheckCircle2 } from 'lucide-react';
+import { Cpu, UserCheck } from 'lucide-react';
 
 export const DecisionLog = () => {
   const { decisions } = useTelemetry();
@@ -16,38 +16,44 @@ export const DecisionLog = () => {
       </div>
 
       <div className="decision-scroll-list">
-        {decisions.map((dec) => (
-          <div
-            key={dec.id}
-            className={`decision-card ${dec.isOverridden ? 'override-card' : ''}`}
-          >
-            <div className="decision-header">
-              <div className="decision-title-group">
-                {dec.isOverridden ? (
-                  <span className="badge badge-red">
-                    <UserCheck size={12} />
-                    OPERATOR OVERRIDE
-                  </span>
-                ) : (
-                  <span className="badge badge-purple">
-                    <Cpu size={12} />
-                    AUTO SCHEDULER
-                  </span>
-                )}
-                <span className="decision-type-badge mono">{dec.selectedType} DISPATCHED</span>
+        {decisions.map((dec) => {
+          const displayTime = dec.createdAt && !isNaN(new Date(dec.createdAt).getTime())
+            ? new Date(dec.createdAt).toLocaleTimeString('en-GB', { hour12: false })
+            : dec.timestamp;
+
+          return (
+            <div
+              key={dec.id}
+              className={`decision-card ${dec.isOverridden ? 'override-card' : ''}`}
+            >
+              <div className="decision-header">
+                <div className="decision-title-group">
+                  {dec.isOverridden ? (
+                    <span className="badge badge-red">
+                      <UserCheck size={12} />
+                      OPERATOR OVERRIDE
+                    </span>
+                  ) : (
+                    <span className="badge badge-purple">
+                      <Cpu size={12} />
+                      AUTO SCHEDULER
+                    </span>
+                  )}
+                  <span className="decision-type-badge mono">{dec.selectedType} DISPATCHED</span>
+                </div>
+                <span className="decision-time mono">{displayTime}</span>
               </div>
-              <span className="decision-time mono">{dec.timestamp}</span>
-            </div>
 
-            <p className="decision-reasoning">{dec.reasoning}</p>
+              <p className="decision-reasoning">{dec.reasoning}</p>
 
-            <div className="decision-footer mono">
-              <span>ID: {dec.id}</span>
-              <span>Pass: {dec.passId}</span>
-              {!dec.isOverridden && <span>Router Score: {dec.score}</span>}
+              <div className="decision-footer mono">
+                <span>ID: {dec.id}</span>
+                <span>Pass: {dec.passId}</span>
+                {!dec.isOverridden && <span>Router Score: {dec.score}</span>}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <style>{`

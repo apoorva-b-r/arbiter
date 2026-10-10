@@ -21,10 +21,10 @@ let currentTelemetry = {
 let telemetryHistory = [];
 
 let queueItems = [
-  { id: 'Q-101', itemId: 'Q-101', type: 'TTC', label: 'Critical Telemetry & Beacon', sizeKb: 12, waitTimeSec: 135, baseWeight: 100, priorityScore: 345, status: 'PENDING', isStarved: true },
-  { id: 'Q-102', itemId: 'Q-102', type: 'SSTV', label: 'Earth Observation Frame #44', sizeKb: 450, waitTimeSec: 85, baseWeight: 60, priorityScore: 215, status: 'PENDING', isStarved: false },
-  { id: 'Q-103', itemId: 'Q-103', type: 'Codec2', label: 'Compressed Voice Beacon Stream', sizeKb: 64, waitTimeSec: 42, baseWeight: 40, priorityScore: 135, status: 'PENDING', isStarved: false },
-  { id: 'Q-104', itemId: 'Q-104', type: 'M17', label: 'Digital Voice Packet Batch', sizeKb: 128, waitTimeSec: 18, baseWeight: 30, priorityScore: 92, status: 'PENDING', isStarved: false }
+  { id: 'Q-101', itemId: 'Q-101', type: 'TTC', label: 'Critical Telemetry & Beacon', sizeKb: 12, waitTimeSec: 45, baseWeight: 100, priorityScore: 145, status: 'PENDING', isStarved: false },
+  { id: 'Q-102', itemId: 'Q-102', type: 'SSTV', label: 'Earth Observation Frame #44', sizeKb: 450, waitTimeSec: 40, baseWeight: 60, priorityScore: 100, status: 'PENDING', isStarved: false },
+  { id: 'Q-103', itemId: 'Q-103', type: 'Codec2', label: 'Compressed Voice Beacon Stream', sizeKb: 64, waitTimeSec: 35, baseWeight: 40, priorityScore: 75, status: 'PENDING', isStarved: false },
+  { id: 'Q-104', itemId: 'Q-104', type: 'M17', label: 'Digital Voice Packet Batch', sizeKb: 128, waitTimeSec: 30, baseWeight: 30, priorityScore: 60, status: 'PENDING', isStarved: false }
 ];
 
 let passes = [
@@ -42,8 +42,9 @@ let passes = [
         id: 'DEC-809',
         decisionId: 'DEC-809',
         timestamp: '12:15:42',
+        createdAt: new Date('2026-08-17T12:15:42Z'),
         selectedType: 'TTC',
-        reasoning: 'SAFETY OVERRIDE: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
+        reasoning: 'STARVATION SAFEGUARD: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
         isOverridden: false,
         passId: 'PASS-20260817-09',
         score: 345
@@ -52,6 +53,7 @@ let passes = [
         id: 'DEC-808',
         decisionId: 'DEC-808',
         timestamp: '12:14:30',
+        createdAt: new Date('2026-08-17T12:14:30Z'),
         selectedType: 'SSTV',
         reasoning: 'SSTV selected: High link quality (92%) allows efficient transfer of 450KB frame. Priority score 215 exceeded candidates.',
         isOverridden: false,
@@ -62,6 +64,7 @@ let passes = [
         id: 'DEC-807',
         decisionId: 'DEC-807',
         timestamp: '12:13:15',
+        createdAt: new Date('2026-08-17T12:13:15Z'),
         selectedType: 'M17',
         reasoning: 'M17 selected: Digital voice packet batch dispatched based on queue weight calculation.',
         isOverridden: false,
@@ -84,6 +87,7 @@ let passes = [
         id: 'DEC-706',
         decisionId: 'DEC-706',
         timestamp: '10:41:00',
+        createdAt: new Date('2026-08-17T10:41:00Z'),
         selectedType: 'TTC',
         reasoning: 'TTC selected: Housekeeping beacon dispatched prior to pass loss of signal. Priority score 310.',
         isOverridden: false,
@@ -94,6 +98,7 @@ let passes = [
         id: 'DEC-705',
         decisionId: 'DEC-705',
         timestamp: '10:39:10',
+        createdAt: new Date('2026-08-17T10:39:10Z'),
         selectedType: 'SSTV',
         reasoning: 'SSTV selected: Image frame payload transmitted at peak SNR 19.5 dB.',
         isOverridden: false,
@@ -105,13 +110,40 @@ let passes = [
 ];
 
 let decisionLog = passes.flatMap(p => p.decisions);
-
 let intervalId = null;
+let tickCounter = 0;
+
+function replenishQueue() {
+  if (queueItems.length < 8) {
+    const templates = [
+      { type: 'TTC', label: 'Periodic Housekeeping Beacon', sizeKb: 14, baseWeight: 100 },
+      { type: 'SSTV', label: 'High-Res Earth Observation Frame', sizeKb: 480, baseWeight: 60 },
+      { type: 'Codec2', label: 'Compressed Digital Voice Stream', sizeKb: 32, baseWeight: 40 },
+      { type: 'M17', label: 'Telemetry Packet Batch', sizeKb: 110, baseWeight: 30 }
+    ];
+    const tmpl = templates[Math.floor(Math.random() * templates.length)];
+    const newItemId = `Q-${Math.floor(100 + Math.random() * 900)}`;
+    queueItems.push({
+      id: newItemId,
+      itemId: newItemId,
+      type: tmpl.type,
+      label: tmpl.label,
+      sizeKb: tmpl.sizeKb,
+      waitTimeSec: 0,
+      baseWeight: tmpl.baseWeight,
+      priorityScore: tmpl.baseWeight,
+      status: 'PENDING',
+      isStarved: false
+    });
+  }
+}
 
 function startSimulator() {
   if (intervalId) return;
 
   intervalId = setInterval(() => {
+    tickCounter++;
+
     // Fluctuate telemetry metrics
     const linkDelta = Math.floor(Math.random() * 7) - 3;
     const newLink = Math.max(20, Math.min(100, currentTelemetry.linkQuality + linkDelta));
@@ -136,26 +168,34 @@ function startSimulator() {
 
         // Save completed pass to MongoDB if connected
         if (isDbConnected()) {
-          Pass.create({
-            passId: activePass.passId,
-            date: activePass.date,
-            startTime: activePass.startTime,
-            endTime: activePass.endTime,
-            durationSec: activePass.durationSec || 600,
-            itemsSent: activePass.itemsSent,
-            overrideCount: activePass.overrideCount,
-            status: 'COMPLETED',
-            peakLinkQuality: activePass.peakLinkQuality || 90,
-            avgBattery: activePass.avgBattery || 85
-          }).catch(err => console.error('[DB ERROR] Failed to save completed pass:', err.message));
+          Pass.updateOne(
+            { passId: activePass.passId },
+            {
+              $set: {
+                passId: activePass.passId,
+                date: activePass.date,
+                startTime: activePass.startTime,
+                endTime: activePass.endTime,
+                durationSec: activePass.durationSec || 600,
+                itemsSent: activePass.itemsSent,
+                overrideCount: activePass.overrideCount,
+                status: 'COMPLETED',
+                peakLinkQuality: activePass.peakLinkQuality || 90,
+                avgBattery: activePass.avgBattery || 85
+              }
+            },
+            { upsert: true }
+          ).catch(err => console.error('[DB ERROR] Failed to save completed pass:', err.message));
         }
       }
 
       // Start new pass
       const now = new Date();
       const dateStr = now.toISOString().slice(0, 10);
+      const datePart = dateStr.replace(/-/g, '');
+      const timePart = now.toTimeString().substring(0, 8).replace(/:/g, '');
       const timeStr = now.toTimeString().substring(0, 8) + ' UTC';
-      const newPassId = `PASS-${dateStr.replace(/-/g, '')}-${(passes.length + 1).toString().padStart(2, '0')}`;
+      const newPassId = `PASS-${datePart}-${timePart}`;
       
       const newPass = {
         passId: newPassId,
@@ -174,7 +214,8 @@ function startSimulator() {
     }
 
     // Append history snapshot
-    const timeStr = new Date().toTimeString().substring(0, 8);
+    const now = new Date();
+    const timeStr = now.toTimeString().substring(0, 8);
     telemetryHistory.push({
       time: timeStr,
       battery: newBat,
@@ -200,11 +241,26 @@ function startSimulator() {
     const decision = router.makeDecision(queueItems, currentTelemetry);
     currentTelemetry.activeMode = decision.selectedType;
 
-    const decId = `DEC-${Date.now().toString().slice(-4)}`;
+    // Remove dispatched item from queue
+    const dispatchedIndex = queueItems.findIndex(
+      item => (decision.selectedItemId && (item.id === decision.selectedItemId || item.itemId === decision.selectedItemId)) ||
+              item.type === decision.selectedType
+    );
+    if (dispatchedIndex !== -1) {
+      queueItems.splice(dispatchedIndex, 1);
+    }
+
+    // Periodically replenish queue items (every 3 ticks or if queue falls below 3 items)
+    if (tickCounter % 3 === 0 || queueItems.length < 3) {
+      replenishQueue();
+    }
+
+    const decId = `DEC-${now.getTime().toString().slice(-4)}`;
     const newDec = {
       id: decId,
       decisionId: decId,
       timestamp: timeStr,
+      createdAt: now,
       selectedType: decision.selectedType,
       reasoning: decision.reasoning,
       isOverridden: false,
@@ -224,6 +280,7 @@ function startSimulator() {
       Decision.create({
         decisionId: newDec.decisionId,
         timestamp: newDec.timestamp,
+        createdAt: newDec.createdAt,
         selectedType: newDec.selectedType,
         reasoning: newDec.reasoning,
         isOverridden: false,
@@ -243,11 +300,21 @@ function getPasses() { return passes; }
 
 function applyOverride(mode) {
   currentTelemetry.activeMode = mode;
-  const decId = `DEC-${Date.now().toString().slice(-4)}`;
+
+  // Remove item of dispatched mode from queue if present
+  const overrideItemIndex = queueItems.findIndex(item => item.type === mode);
+  if (overrideItemIndex !== -1) {
+    queueItems.splice(overrideItemIndex, 1);
+  }
+
+  const now = new Date();
+  const timeStr = now.toTimeString().substring(0, 8);
+  const decId = `DEC-${now.getTime().toString().slice(-4)}`;
   const newDec = {
     id: decId,
     decisionId: decId,
-    timestamp: new Date().toTimeString().substring(0, 8),
+    timestamp: timeStr,
+    createdAt: now,
     selectedType: mode,
     reasoning: `OPERATOR OVERRIDE: Ground station engineer commanded direct transmission of ${mode}. Router automated selection bypassed.`,
     isOverridden: true,
@@ -267,6 +334,7 @@ function applyOverride(mode) {
     Decision.create({
       decisionId: newDec.decisionId,
       timestamp: newDec.timestamp,
+      createdAt: newDec.createdAt,
       selectedType: newDec.selectedType,
       reasoning: newDec.reasoning,
       isOverridden: true,

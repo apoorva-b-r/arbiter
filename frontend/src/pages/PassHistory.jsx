@@ -1,22 +1,43 @@
 import React, { useState } from 'react';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useTelemetry } from '../context/TelemetryContext';
-import { History, Eye, X, CheckCircle2, UserCheck, Calendar, Clock } from 'lucide-react';
+import { api } from '../api/client';
+import { History, Eye, X, CheckCircle2, UserCheck, Calendar, Clock, Loader2 } from 'lucide-react';
 
 export const PassHistory = () => {
-  const { passes, decisions } = useTelemetry();
+  const { passes } = useTelemetry();
   const [selectedPass, setSelectedPass] = useState(null);
+  const [modalDecisions, setModalDecisions] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
 
-  const getPassDecisions = (pass) => {
-    if (!pass) return [];
-    if (pass.decisions && pass.decisions.length > 0) {
-      return pass.decisions;
+  const handleInspectLogs = async (pass) => {
+    setSelectedPass(pass);
+    setModalLoading(true);
+    setModalDecisions([]);
+
+    try {
+      const detail = await api.getPassDetail(pass.passId);
+      if (detail && Array.isArray(detail.decisions)) {
+        setModalDecisions(detail.decisions);
+      } else if (pass.decisions && Array.isArray(pass.decisions)) {
+        setModalDecisions(pass.decisions);
+      } else {
+        setModalDecisions([]);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch pass detail, falling back to pass data:', err);
+      setModalDecisions(pass.decisions || []);
+    } finally {
+      setModalLoading(false);
     }
-    return decisions.filter(d => d.passId === pass.passId);
   };
 
-  const getItemsSent = (pass) => getPassDecisions(pass).length;
-  const getOverrideCount = (pass) => getPassDecisions(pass).filter(d => d.isOverridden || d.wasOverride).length;
+  const getPassDecisions = (pass) => {
+    return Array.isArray(pass.decisions) ? pass.decisions : [];
+  };
+
+  const getItemsSent = (pass) => pass.itemsSent ?? getPassDecisions(pass).length;
+  const getOverrideCount = (pass) => pass.overrideCount ?? getPassDecisions(pass).filter(d => d.isOverridden || d.wasOverride).length;
   const getOverridePercentage = (pass) => {
     const total = getItemsSent(pass);
     const overrides = getOverrideCount(pass);
@@ -84,7 +105,7 @@ export const PassHistory = () => {
                   </td>
                   <td>
                     <button
-                      onClick={() => setSelectedPass(pass)}
+                      onClick={() => handleInspectLogs(pass)}
                       className="btn btn-outline btn-sm"
                     >
                       <Eye size={14} />
@@ -100,10 +121,9 @@ export const PassHistory = () => {
 
       {/* Pass Detail Modal */}
       {selectedPass && (() => {
-        const passDecisions = getPassDecisions(selectedPass);
-        const itemsSent = getItemsSent(selectedPass);
-        const overrideCount = getOverrideCount(selectedPass);
-        const overridePct = getOverridePercentage(selectedPass);
+        const itemsSent = modalDecisions.length;
+        const overrideCount = modalDecisions.filter(d => d.isOverridden || d.wasOverride).length;
+        const overridePct = itemsSent > 0 ? Math.round((overrideCount / itemsSent) * 100) : 0;
 
         return (
           <div className="modal-backdrop">
@@ -136,30 +156,38 @@ export const PassHistory = () => {
 
               <h4 className="modal-section-title">Decision Timeline Log</h4>
               <div className="modal-scroll-list">
-                {passDecisions.length > 0 ? (
+                {modalLoading ? (
+                  <div className="empty-decisions-notice mono text-sm" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    <Loader2 size={16} className="animate-spin" />
+                    Fetching pass decision logs from ground station...
+                  </div>
+                ) : modalDecisions.length > 0 ? (
                   <>
-                    {passDecisions.map((dec) => {
-                      const isOverridden = dec.isOverridden || dec.wasOverride;
-                      const itemType = dec.selectedType || dec.itemType || 'DATA';
-                      const reasoning = dec.reasoning || dec.reason;
+                      {modalDecisions.map((dec) => {
+                        const isOverridden = dec.isOverridden || dec.wasOverride;
+                        const itemType = dec.selectedType || dec.itemType || 'DATA';
+                        const reasoning = dec.reasoning || dec.reason;
+                        const displayTime = dec.createdAt && !isNaN(new Date(dec.createdAt).getTime())
+                          ? new Date(dec.createdAt).toLocaleTimeString('en-GB', { hour12: false })
+                          : dec.timestamp;
 
-                      return (
-                        <div key={dec.id} className={`decision-card ${isOverridden ? 'override-card' : ''}`}>
-                          <div className="decision-header">
-                            <div className="decision-title-group">
-                              {isOverridden ? (
-                                <span className="badge badge-red mono">
-                                  <UserCheck size={12} /> OVERRIDDEN
-                                </span>
-                              ) : (
-                                <span className="badge badge-purple mono">
-                                  <CheckCircle2 size={12} /> AI ROUTED
-                                </span>
-                              )}
-                              <span className="decision-type-badge mono">{itemType} DISPATCHED</span>
+                        return (
+                          <div key={dec.id || dec.decisionId || dec._id} className={`decision-card ${isOverridden ? 'override-card' : ''}`}>
+                            <div className="decision-header">
+                              <div className="decision-title-group">
+                                {isOverridden ? (
+                                  <span className="badge badge-red mono">
+                                    <UserCheck size={12} /> OVERRIDDEN
+                                  </span>
+                                ) : (
+                                  <span className="badge badge-purple mono">
+                                    <CheckCircle2 size={12} /> AI ROUTED
+                                  </span>
+                                )}
+                                <span className="decision-type-badge mono">{itemType} DISPATCHED</span>
+                              </div>
+                              <span className="mono text-muted text-xs">{displayTime}</span>
                             </div>
-                            <span className="mono text-muted text-xs">{dec.timestamp}</span>
-                          </div>
                           <p className="decision-reasoning">{reasoning}</p>
                         </div>
                       );
