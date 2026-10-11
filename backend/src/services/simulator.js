@@ -3,10 +3,32 @@
  * Generates mock satellite telemetry metrics and enqueues payload items on a 3-second interval
  */
 
+const mongoose = require('mongoose');
 const router = require('./router');
 const { isDbConnected } = require('../db');
 const Decision = require('../models/Decision');
 const Pass = require('../models/Pass');
+
+function pad(n) {
+  return String(n).padStart(2, '0');
+}
+
+function getLocalPassInfo(dateObj) {
+  const year = dateObj.getFullYear();
+  const month = pad(dateObj.getMonth() + 1);
+  const day = pad(dateObj.getDate());
+  const hours = pad(dateObj.getHours());
+  const minutes = pad(dateObj.getMinutes());
+  const seconds = pad(dateObj.getSeconds());
+
+  const dateStr = `${year}-${month}-${day}`;
+  const timeStr = `${hours}:${minutes}:${seconds}`;
+  const passId = `PASS-${year}${month}${day}-${hours}${minutes}${seconds}`;
+
+  return { passId, dateStr, timeStr, hours, minutes, seconds };
+}
+
+const initialPassInfo = getLocalPassInfo(new Date());
 
 let currentTelemetry = {
   battery: 84.5,
@@ -14,8 +36,8 @@ let currentTelemetry = {
   snr: 18.2,
   activeMode: 'TTC',
   passStatus: 'ACTIVE',
-  passTimeRemainingSec: 420,
-  currentPassId: 'PASS-20260817-09'
+  passTimeRemainingSec: 600,
+  currentPassId: initialPassInfo.passId
 };
 
 let telemetryHistory = [];
@@ -29,80 +51,54 @@ let queueItems = [
 
 let passes = [
   {
-    passId: 'PASS-20260817-09',
-    date: '2026-08-17',
-    startTime: '12:10:00 UTC',
+    passId: initialPassInfo.passId,
+    date: initialPassInfo.dateStr,
+    startTime: initialPassInfo.timeStr,
     endTime: 'Active',
     durationSec: 600,
+    itemsSent: 0,
+    overrideCount: 0,
     status: 'ACTIVE',
-    peakLinkQuality: 92,
-    avgBattery: 85.2,
-    decisions: [
-      {
-        id: 'DEC-809',
-        decisionId: 'DEC-809',
-        timestamp: '12:15:42',
-        createdAt: new Date('2026-08-17T12:15:42Z'),
-        selectedType: 'TTC',
-        reasoning: 'STARVATION SAFEGUARD: TT&C wait time (135s) exceeded 120s starvation threshold. High priority dispatch forced.',
-        isOverridden: false,
-        passId: 'PASS-20260817-09',
-        score: 345
-      },
-      {
-        id: 'DEC-808',
-        decisionId: 'DEC-808',
-        timestamp: '12:14:30',
-        createdAt: new Date('2026-08-17T12:14:30Z'),
-        selectedType: 'SSTV',
-        reasoning: 'SSTV selected: High link quality (92%) allows efficient transfer of 450KB frame. Priority score 215 exceeded candidates.',
-        isOverridden: false,
-        passId: 'PASS-20260817-09',
-        score: 215
-      },
-      {
-        id: 'DEC-807',
-        decisionId: 'DEC-807',
-        timestamp: '12:13:15',
-        createdAt: new Date('2026-08-17T12:13:15Z'),
-        selectedType: 'M17',
-        reasoning: 'M17 selected: Digital voice packet batch dispatched based on queue weight calculation.',
-        isOverridden: false,
-        passId: 'PASS-20260817-09',
-        score: 180
-      }
-    ]
+    peakLinkQuality: 88,
+    avgBattery: 84.5,
+    batterySum: 84.5,
+    batteryCount: 1,
+    createdAt: new Date(),
+    decisions: []
   },
   {
-    passId: 'PASS-20260817-08',
+    passId: 'PASS-20260817-103215',
     date: '2026-08-17',
-    startTime: '10:32:15 UTC',
-    endTime: '10:42:15 UTC',
+    startTime: '10:32:15',
+    endTime: '10:42:15',
     durationSec: 600,
+    itemsSent: 2,
+    overrideCount: 0,
     status: 'COMPLETED',
     peakLinkQuality: 95,
     avgBattery: 88.0,
+    createdAt: new Date('2026-08-17T10:32:15'),
     decisions: [
       {
         id: 'DEC-706',
         decisionId: 'DEC-706',
         timestamp: '10:41:00',
-        createdAt: new Date('2026-08-17T10:41:00Z'),
+        createdAt: new Date('2026-08-17T10:41:00'),
         selectedType: 'TTC',
         reasoning: 'TTC selected: Housekeeping beacon dispatched prior to pass loss of signal. Priority score 310.',
         isOverridden: false,
-        passId: 'PASS-20260817-08',
+        passId: 'PASS-20260817-103215',
         score: 310
       },
       {
         id: 'DEC-705',
         decisionId: 'DEC-705',
         timestamp: '10:39:10',
-        createdAt: new Date('2026-08-17T10:39:10Z'),
+        createdAt: new Date('2026-08-17T10:39:10'),
         selectedType: 'SSTV',
         reasoning: 'SSTV selected: Image frame payload transmitted at peak SNR 19.5 dB.',
         isOverridden: false,
-        passId: 'PASS-20260817-08',
+        passId: 'PASS-20260817-103215',
         score: 240
       }
     ]
@@ -112,6 +108,99 @@ let passes = [
 let decisionLog = passes.flatMap(p => p.decisions);
 let intervalId = null;
 let tickCounter = 0;
+
+function startNewPass(now = new Date()) {
+  const info = getLocalPassInfo(now);
+  const durationSec = 600;
+
+  const newPass = {
+    passId: info.passId,
+    date: info.dateStr,
+    startTime: info.timeStr,
+    endTime: 'Active',
+    durationSec,
+    itemsSent: 0,
+    overrideCount: 0,
+    status: 'ACTIVE',
+    peakLinkQuality: currentTelemetry.linkQuality,
+    avgBattery: currentTelemetry.battery,
+    batterySum: currentTelemetry.battery,
+    batteryCount: 1,
+    createdAt: now,
+    decisions: []
+  };
+
+  passes.unshift(newPass);
+  currentTelemetry.currentPassId = info.passId;
+  currentTelemetry.passTimeRemainingSec = durationSec;
+  currentTelemetry.passStatus = 'ACTIVE';
+
+  if (isDbConnected()) {
+    Pass.updateMany(
+      { passId: { $ne: info.passId }, status: 'ACTIVE' },
+      { $set: { status: 'COMPLETED' } }
+    ).catch(() => {});
+
+    Pass.updateOne(
+      { passId: info.passId },
+      {
+        $set: {
+          passId: info.passId,
+          date: info.dateStr,
+          startTime: info.timeStr,
+          endTime: 'Active',
+          durationSec,
+          itemsSent: 0,
+          overrideCount: 0,
+          status: 'ACTIVE',
+          peakLinkQuality: currentTelemetry.linkQuality,
+          avgBattery: currentTelemetry.battery,
+          createdAt: now
+        }
+      },
+      { upsert: true }
+    ).catch(err => console.error('[DB ERROR] Failed to upsert active pass:', err.message));
+  }
+
+  return newPass;
+}
+
+async function cleanupOldActivePasses() {
+  if (isDbConnected()) {
+    try {
+      await Pass.updateMany({ status: 'ACTIVE' }, { $set: { status: 'COMPLETED' } });
+    } catch (err) {
+      console.error('[DB ERROR] Failed to clean up leftover active passes:', err.message);
+    }
+  }
+}
+
+async function syncActivePassToDb() {
+  if (isDbConnected()) {
+    const activePass = passes.find(p => p.passId === currentTelemetry.currentPassId);
+    if (activePass) {
+      await Pass.updateOne(
+        { passId: activePass.passId },
+        {
+          $set: {
+            passId: activePass.passId,
+            date: activePass.date,
+            startTime: activePass.startTime,
+            endTime: 'Active',
+            durationSec: activePass.durationSec || 600,
+            itemsSent: activePass.itemsSent || 0,
+            overrideCount: activePass.overrideCount || 0,
+            status: 'ACTIVE',
+            peakLinkQuality: activePass.peakLinkQuality || 88,
+            avgBattery: activePass.avgBattery || 84.5,
+            createdAt: activePass.createdAt || new Date()
+          }
+        },
+        { upsert: true }
+      ).catch(err => console.error('[DB ERROR] Failed to upsert active pass:', err.message));
+    }
+  }
+}
 
 function replenishQueue() {
   if (queueItems.length < 8) {
@@ -138,8 +227,19 @@ function replenishQueue() {
   }
 }
 
-function startSimulator() {
+async function startSimulator() {
   if (intervalId) return;
+
+  // Mark leftover ACTIVE passes from previous run as COMPLETED and upsert current active pass
+  if (isDbConnected()) {
+    await cleanupOldActivePasses();
+    await syncActivePassToDb();
+  }
+
+  mongoose.connection.on('connected', async () => {
+    await cleanupOldActivePasses();
+    await syncActivePassToDb();
+  });
 
   intervalId = setInterval(() => {
     tickCounter++;
@@ -154,6 +254,16 @@ function startSimulator() {
     currentTelemetry.linkQuality = newLink;
     currentTelemetry.battery = newBat;
     currentTelemetry.snr = Math.round((newLink / 5) * 10) / 10;
+
+    const activePass = passes.find(p => p.passId === currentTelemetry.currentPassId);
+    if (activePass) {
+      if (newLink > (activePass.peakLinkQuality || 0)) {
+        activePass.peakLinkQuality = newLink;
+      }
+      activePass.batterySum = (activePass.batterySum || activePass.avgBattery || newBat) + newBat;
+      activePass.batteryCount = (activePass.batteryCount || 1) + 1;
+      activePass.avgBattery = Math.round((activePass.batterySum / activePass.batteryCount) * 10) / 10;
+    }
     
     if (currentTelemetry.passTimeRemainingSec > 0) {
       currentTelemetry.passTimeRemainingSec -= 3;
@@ -161,8 +271,11 @@ function startSimulator() {
       // Pass finished! Complete active pass and save to DB
       const activePass = passes.find(p => p.passId === currentTelemetry.currentPassId);
       if (activePass) {
+        const now = new Date();
+        const endInfo = getLocalPassInfo(now);
+
         activePass.status = 'COMPLETED';
-        activePass.endTime = new Date().toTimeString().substring(0, 8) + ' UTC';
+        activePass.endTime = endInfo.timeStr;
         activePass.itemsSent = (activePass.decisions || []).length;
         activePass.overrideCount = (activePass.decisions || []).filter(d => d.isOverridden).length;
 
@@ -189,35 +302,15 @@ function startSimulator() {
         }
       }
 
-      // Start new pass
-      const now = new Date();
-      const dateStr = now.toISOString().slice(0, 10);
-      const datePart = dateStr.replace(/-/g, '');
-      const timePart = now.toTimeString().substring(0, 8).replace(/:/g, '');
-      const timeStr = now.toTimeString().substring(0, 8) + ' UTC';
-      const newPassId = `PASS-${datePart}-${timePart}`;
-      
-      const newPass = {
-        passId: newPassId,
-        date: dateStr,
-        startTime: timeStr,
-        endTime: 'Active',
-        durationSec: 600,
-        status: 'ACTIVE',
-        peakLinkQuality: currentTelemetry.linkQuality,
-        avgBattery: currentTelemetry.battery,
-        decisions: []
-      };
-      passes.unshift(newPass);
-      currentTelemetry.currentPassId = newPassId;
-      currentTelemetry.passTimeRemainingSec = 600;
+      // Start new pass with local time ID and status ACTIVE
+      startNewPass();
     }
 
     // Append history snapshot
     const now = new Date();
-    const timeStr = now.toTimeString().substring(0, 8);
+    const decInfo = getLocalPassInfo(now);
     telemetryHistory.push({
-      time: timeStr,
+      time: decInfo.timeStr,
       battery: newBat,
       linkQuality: newLink,
       snr: currentTelemetry.snr
@@ -259,7 +352,7 @@ function startSimulator() {
     const newDec = {
       id: decId,
       decisionId: decId,
-      timestamp: timeStr,
+      timestamp: decInfo.timeStr,
       createdAt: now,
       selectedType: decision.selectedType,
       reasoning: decision.reasoning,
@@ -269,10 +362,22 @@ function startSimulator() {
     };
 
     decisionLog.unshift(newDec);
-    const activePass = passes.find(p => p.passId === currentTelemetry.currentPassId);
     if (activePass) {
       if (!activePass.decisions) activePass.decisions = [];
       activePass.decisions.unshift(newDec);
+      activePass.itemsSent = activePass.decisions.length;
+      activePass.overrideCount = activePass.decisions.filter(d => d.isOverridden).length;
+      if (isDbConnected()) {
+        Pass.updateOne(
+          { passId: activePass.passId },
+          {
+            $set: {
+              itemsSent: activePass.itemsSent,
+              overrideCount: activePass.overrideCount
+            }
+          }
+        ).catch(() => {});
+      }
     }
 
     // Fire-and-forget save auto decision to MongoDB if connected
@@ -308,7 +413,7 @@ function applyOverride(mode) {
   }
 
   const now = new Date();
-  const timeStr = now.toTimeString().substring(0, 8);
+  const timeStr = getLocalPassInfo(now).timeStr;
   const decId = `DEC-${now.getTime().toString().slice(-4)}`;
   const newDec = {
     id: decId,
@@ -327,6 +432,19 @@ function applyOverride(mode) {
   if (activePass) {
     if (!activePass.decisions) activePass.decisions = [];
     activePass.decisions.unshift(newDec);
+    activePass.itemsSent = activePass.decisions.length;
+    activePass.overrideCount = activePass.decisions.filter(d => d.isOverridden).length;
+    if (isDbConnected()) {
+      Pass.updateOne(
+        { passId: activePass.passId },
+        {
+          $set: {
+            itemsSent: activePass.itemsSent,
+            overrideCount: activePass.overrideCount
+          }
+        }
+      ).catch(() => {});
+    }
   }
 
   // Fire-and-forget save override decision to MongoDB if connected

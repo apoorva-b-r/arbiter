@@ -122,6 +122,8 @@ export const TelemetryProvider = ({ children }) => {
   telemetryRef.current = telemetry;
   const historyRef = React.useRef(telemetryHistory);
   historyRef.current = telemetryHistory;
+  const settingsRef = React.useRef(settings);
+  settingsRef.current = settings;
 
   // Automatically update queue scoring and sorting whenever settings change
   useEffect(() => {
@@ -259,11 +261,13 @@ export const TelemetryProvider = ({ children }) => {
 
     const pollBackendOrSimulate = async () => {
       try {
-        const [telData, histData, queueData, decData] = await Promise.all([
-          api.getTelemetry(),
+        const telData = await api.getTelemetry();
+        const activePassId = telData?.currentPassId || telemetryRef.current?.currentPassId;
+
+        const [histData, queueData, decData] = await Promise.all([
           api.getTelemetryHistory(),
           api.getQueue(),
-          api.getDecisions(telemetry.currentPassId, 20)
+          api.getDecisions(activePassId, 20)
         ]);
 
         if (telData) {
@@ -273,7 +277,7 @@ export const TelemetryProvider = ({ children }) => {
           setTelemetryHistory(histData);
         }
         if (Array.isArray(queueData)) {
-          setQueue(computePriorityQueue(queueData, telData || telemetry, settings));
+          setQueue(computePriorityQueue(queueData, telData || telemetryRef.current, settingsRef.current));
         }
         if (Array.isArray(decData)) {
           setDecisions(processDecisions(decData));

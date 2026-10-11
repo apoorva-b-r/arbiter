@@ -62,6 +62,11 @@ npm run seed
 ```
 *(Note: Only the team lead should run this as it resets shared database history).*
 
+Seed initial operator user credentials (`Operator-Alpha`):
+```bash
+npm run seed:user
+```
+
 ### 5. Launch Application
 Start both Express backend server and React Vite frontend concurrently:
 ```bash
@@ -82,7 +87,7 @@ npm run dev
 
 1. **AI Priority Router Formula**:
    $$\text{Score} = \text{BaseWeight} + (\text{WaitTime}_{\text{sec}} \times 1.5) + (\text{LinkQuality}_{\%} \times 0.8)$$
-2. **TT&C Starvation Safety Override**:
+2. **TT&C Starvation Safeguard**:
    If TT&C (Telemetry & Command) has been waiting for $> 120\text{s}$, the AI router forces TT&C dispatch regardless of candidate scores to prevent satellite health telemetry blackout.
 3. **Operator Manual Override**:
    Ground station engineers can manually select TTC, SSTV, Codec2, or M17 transmission modes, bypassing the AI router. All manual overrides are logged as `"OPERATOR OVERRIDE"`.

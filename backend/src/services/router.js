@@ -101,9 +101,9 @@ function makeDecision(queueItems, telemetry) {
       return {
         selectedType: 'TTC',
         reasoning:
-          `SAFETY OVERRIDE: Link quality is ${telemetry.linkQuality}%, ` +
+          `LINK QUALITY SAFEGUARD: Link quality is ${telemetry.linkQuality}%, ` +
           'below 20%. Only TT&C is eligible for transmission.',
-        isOverridden: true,
+        isOverridden: false,
         score: calculateScore(ttc, telemetry),
         selectedItemId: ttc.id || ttc.itemId
       };
@@ -125,9 +125,9 @@ function makeDecision(queueItems, telemetry) {
     return {
       selectedType: 'TTC',
       reasoning:
-        'SAFETY FALLBACK: SSTV is blocked by the low-battery restriction. ' +
+        'BATTERY SAFEGUARD: SSTV is blocked by the low-battery restriction. ' +
         'Defaulting to TT&C.',
-      isOverridden: true,
+      isOverridden: false,
       score: ttc ? calculateScore(ttc, telemetry) : 100,
       selectedItemId: ttc ? (ttc.id || ttc.itemId) : undefined
     };

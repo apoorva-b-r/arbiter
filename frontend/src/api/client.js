@@ -78,6 +78,11 @@ const mapScenario = (s) => ({
   id: s.id || s.scenarioId
 });
 
+const mapValidationRun = (r) => ({
+  ...r,
+  run: r.versionLabel || r.run
+});
+
 export const api = {
   // Telemetry API
   getTelemetry: async () => {
@@ -200,8 +205,8 @@ export const api = {
   getValidationRuns: async () => {
     return withFallback(async () => {
       const data = await request('/validation/runs');
-      return Array.isArray(data) ? data : [];
-    }, MOCK_VALIDATION_RUNS);
+      return Array.isArray(data) ? data.map(mapValidationRun) : [];
+    }, MOCK_VALIDATION_RUNS.map(mapValidationRun));
   },
 
   // Auth API

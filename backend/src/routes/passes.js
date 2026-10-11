@@ -11,22 +11,49 @@ router.get('/', async (req, res) => {
     if (isDbConnected()) {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const dateCutoffStr = thirtyDaysAgo.toISOString().slice(0, 10);
+      const year = thirtyDaysAgo.getFullYear();
+      const month = String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0');
+      const day = String(thirtyDaysAgo.getDate()).padStart(2, '0');
+      const dateCutoffStr = `${year}-${month}-${day}`;
 
       const dbPasses = await Pass.find({
         $or: [
+          { status: 'ACTIVE' },
           { date: { $gte: dateCutoffStr } },
           { createdAt: { $gte: thirtyDaysAgo } }
         ]
-      }).sort({ date: -1, startTime: -1, _id: -1 }).lean();
+      }).lean();
 
       if (dbPasses && dbPasses.length > 0) {
+        dbPasses.sort((a, b) => {
+          if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
+          if (b.status === 'ACTIVE' && a.status !== 'ACTIVE') return 1;
+          const dateCmp = (b.date || '').localeCompare(a.date || '');
+          if (dateCmp !== 0) return dateCmp;
+          return (b.passId || b.startTime || '').localeCompare(a.passId || a.startTime || '');
+        });
+
         const populatedPasses = await Promise.all(
           dbPasses.map(async p => {
             const decisions = await Decision.find({ passId: p.passId }).sort({ timestamp: -1, _id: -1 }).lean();
+
+            let createdAt = p.createdAt;
+            if (!createdAt && p.passId) {
+              const m = p.passId.match(/^PASS-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+              if (m) {
+                createdAt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+              } else if (p.date && p.startTime) {
+                const cleanTime = String(p.startTime).replace(' UTC', '').trim();
+                const [y, mo, d] = p.date.split('-').map(Number);
+                const [h, mi, s] = cleanTime.split(':').map(Number);
+                createdAt = new Date(y, mo - 1, d, h || 0, mi || 0, s || 0);
+              }
+            }
+
             return {
               ...p,
               id: p.passId,
+              createdAt,
               decisions: decisions.map(d => ({ ...d, id: d.decisionId || d._id }))
             };
           })
@@ -51,9 +78,24 @@ router.get('/:passId', async (req, res) => {
       const pass = await Pass.findOne({ passId }).lean();
       if (pass) {
         const decisions = await Decision.find({ passId }).sort({ timestamp: -1, _id: -1 }).lean();
+
+        let createdAt = pass.createdAt;
+        if (!createdAt && pass.passId) {
+          const m = pass.passId.match(/^PASS-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+          if (m) {
+            createdAt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+          } else if (pass.date && pass.startTime) {
+            const cleanTime = String(pass.startTime).replace(' UTC', '').trim();
+            const [y, mo, d] = pass.date.split('-').map(Number);
+            const [h, mi, s] = cleanTime.split(':').map(Number);
+            createdAt = new Date(y, mo - 1, d, h || 0, mi || 0, s || 0);
+          }
+        }
+
         return res.status(200).json({
           ...pass,
           id: pass.passId,
+          createdAt,
           decisions: decisions.map(d => ({ ...d, id: d.decisionId || d._id }))
         });
       }
