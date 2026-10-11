@@ -137,6 +137,38 @@ export const api = {
     return mapPass(data);
   },
 
+  createPass: async () => {
+    return withFallback(async () => {
+      const data = await request('/passes', {
+        method: 'POST'
+      });
+      return mapPass(data);
+    }, () => {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const year = now.getFullYear();
+      const month = pad(now.getMonth() + 1);
+      const day = pad(now.getDate());
+      const hours = pad(now.getHours());
+      const minutes = pad(now.getMinutes());
+      const seconds = pad(now.getSeconds());
+      const passId = `PASS-${year}${month}${day}-${hours}${minutes}${seconds}`;
+      return mapPass({
+        passId,
+        date: `${year}-${month}-${day}`,
+        startTime: `${hours}:${minutes}:${seconds}`,
+        endTime: 'Active',
+        durationSec: 600,
+        itemsSent: 0,
+        overrideCount: 0,
+        status: 'ACTIVE',
+        peakLinkQuality: 88,
+        avgBattery: 84.5,
+        decisions: []
+      });
+    });
+  },
+
   // Operator Override API
   sendOverride: async (mode) => {
     return withFallback(async () => {

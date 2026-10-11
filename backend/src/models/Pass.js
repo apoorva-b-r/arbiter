@@ -8,7 +8,7 @@ const PassSchema = new mongoose.Schema({
   durationSec: { type: Number, default: 600 },
   itemsSent: { type: Number, default: 0 },
   overrideCount: { type: Number, default: 0 },
-  status: { type: String, enum: ['ACTIVE', 'COMPLETED'], default: 'ACTIVE' },
+  status: { type: String, enum: ['ACTIVE', 'COMPLETED', 'INTERRUPTED'], default: 'ACTIVE' },
   peakLinkQuality: { type: Number, default: 90 },
   avgBattery: { type: Number, default: 85 },
   operatorNotes: { type: String, maxlength: 500, default: '' }

@@ -470,6 +470,60 @@ function deletePass(passId) {
   decisionLog = decisionLog.filter(d => d.passId !== passId);
 }
 
+async function createNewPass(reason = 'MANUAL') {
+  const now = new Date();
+  const endInfo = getLocalPassInfo(now);
+
+  const activePass = passes.find(p => p.passId === currentTelemetry.currentPassId && p.status === 'ACTIVE');
+  if (activePass) {
+    activePass.status = 'INTERRUPTED';
+    activePass.endTime = endInfo.timeStr;
+    activePass.itemsSent = (activePass.decisions || []).length;
+    activePass.overrideCount = (activePass.decisions || []).filter(d => d.isOverridden).length;
+
+    if (isDbConnected()) {
+      try {
+        await Pass.updateOne(
+          { passId: activePass.passId },
+          {
+            $set: {
+              status: 'INTERRUPTED',
+              endTime: activePass.endTime,
+              itemsSent: activePass.itemsSent,
+              overrideCount: activePass.overrideCount
+            }
+          }
+        );
+      } catch (err) {
+        console.error('[DB ERROR] Failed to finalize interrupted pass:', err.message);
+      }
+    }
+  }
+
+  let newPassTime = new Date();
+  let info = getLocalPassInfo(newPassTime);
+  while (passes.some(p => p.passId === info.passId)) {
+    newPassTime = new Date(newPassTime.getTime() + 1000);
+    info = getLocalPassInfo(newPassTime);
+  }
+
+  const newPass = startNewPass(newPassTime);
+
+  // Reset TTC starvation on current queue items without clobbering the queue
+  queueItems = queueItems.map(item => {
+    if (item.type === 'TTC') {
+      const updated = { ...item, waitTimeSec: 0, isStarved: false };
+      return {
+        ...updated,
+        priorityScore: router.calculateScore(updated, currentTelemetry)
+      };
+    }
+    return item;
+  });
+
+  return newPass;
+}
+
 module.exports = {
   startSimulator,
   getTelemetry,
@@ -478,5 +532,6 @@ module.exports = {
   getDecisions,
   getPasses,
   applyOverride,
-  deletePass
+  deletePass,
+  createNewPass
 };

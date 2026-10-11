@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useTelemetry } from '../context/TelemetryContext';
 import { api } from '../api/client';
-import { History, Eye, X, CheckCircle2, UserCheck, Calendar, Clock, Loader2, Edit3, Save } from 'lucide-react';
+import { History, Eye, X, CheckCircle2, UserCheck, Calendar, Clock, Loader2, Edit3, Save, Plus, AlertTriangle } from 'lucide-react';
 
 const formatPassTime = (createdAt, timeStr, dateStr) => {
   if (createdAt) {
@@ -25,7 +25,7 @@ const formatPassTime = (createdAt, timeStr, dateStr) => {
 };
 
 export const PassHistory = () => {
-  const { passes, backendOnline } = useTelemetry();
+  const { passes, backendOnline, createNewPass } = useTelemetry();
   const [selectedPass, setSelectedPass] = useState(null);
   const [modalDecisions, setModalDecisions] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
@@ -34,6 +34,48 @@ export const PassHistory = () => {
   const [notesText, setNotesText] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesError, setNotesError] = useState('');
+
+  const [isCreatingPass, setIsCreatingPass] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState(null);
+
+  const handleNewPassClick = () => {
+    const hasActivePass = passes.some(p => p.status === 'ACTIVE');
+    if (hasActivePass) {
+      setShowConfirmModal(true);
+    } else {
+      handleExecuteNewPass();
+    }
+  };
+
+  const handleExecuteNewPass = async () => {
+    if (isCreatingPass) return;
+    setIsCreatingPass(true);
+    setFeedbackMessage(null);
+
+    try {
+      const res = await createNewPass();
+      if (res && res.success) {
+        setFeedbackMessage({
+          type: 'success',
+          text: `New pass ${res.pass?.passId || ''} initiated successfully. Previous pass preserved in history.`
+        });
+      } else {
+        setFeedbackMessage({
+          type: 'error',
+          text: (res && res.error) || 'Failed to start new pass. Please try again.'
+        });
+      }
+    } catch (err) {
+      setFeedbackMessage({
+        type: 'error',
+        text: err.message || 'An unexpected error occurred while starting a new pass.'
+      });
+    } finally {
+      setIsCreatingPass(false);
+      setShowConfirmModal(false);
+    }
+  };
 
   const handleInspectLogs = async (pass) => {
     setSelectedPass(pass);
@@ -86,8 +128,64 @@ export const PassHistory = () => {
             <History size={16} style={{ color: 'var(--accent-blue)' }} />
             Recorded Pass History (Last 30 Days)
           </span>
-          <span className="badge badge-blue mono">{passes.length} PASSES RECORDED</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span className="badge badge-blue mono">{passes.length} PASSES RECORDED</span>
+            <button
+              id="new-pass-btn"
+              onClick={handleNewPassClick}
+              disabled={isCreatingPass}
+              className="btn btn-sm"
+              style={{
+                borderRadius: '999px',
+                backgroundColor: 'var(--color-berry-rose)',
+                color: 'var(--text-inverse)',
+                border: '1px solid var(--color-raspberry)',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                fontFamily: 'var(--font-mono)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                padding: '0.25rem 0.75rem',
+                gap: '0.35rem',
+                cursor: isCreatingPass ? 'not-allowed' : 'pointer',
+                opacity: isCreatingPass ? 0.7 : 1,
+                boxShadow: '0 2px 6px rgba(138, 40, 70, 0.25)',
+                transition: 'all 0.2s ease',
+                display: 'inline-flex',
+                alignItems: 'center'
+              }}
+            >
+              <Plus size={13} strokeWidth={2.5} />
+              {isCreatingPass ? 'STARTING...' : 'NEW PASS'}
+            </button>
+          </div>
         </div>
+
+        {feedbackMessage && (
+          <div
+            style={{
+              padding: '0.75rem 1.25rem',
+              margin: '0.75rem 1.25rem 0',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.85rem',
+              fontFamily: 'var(--font-sans)',
+              backgroundColor: feedbackMessage.type === 'success' ? 'var(--alert-success-bg)' : 'var(--alert-critical-bg)',
+              color: feedbackMessage.type === 'success' ? 'var(--alert-success-text)' : 'var(--alert-critical-text)',
+              border: `1px solid ${feedbackMessage.type === 'success' ? 'var(--alert-success-border)' : 'var(--alert-critical-border)'}`
+            }}
+          >
+            <span>{feedbackMessage.text}</span>
+            <button
+              onClick={() => setFeedbackMessage(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
 
         <table className="tech-table">
           <thead>
@@ -130,7 +228,7 @@ export const PassHistory = () => {
                   </td>
                   <td className="mono">{pass.peakLinkQuality}%</td>
                   <td>
-                    <span className={`badge ${pass.status === 'ACTIVE' ? 'badge-green' : 'badge-purple'}`}>
+                    <span className={`badge ${pass.status === 'ACTIVE' ? 'badge-green' : pass.status === 'INTERRUPTED' ? 'badge-amber' : 'badge-purple'}`}>
                       {pass.status}
                     </span>
                   </td>
@@ -327,6 +425,60 @@ export const PassHistory = () => {
           </div>
         );
       })()}
+
+      {/* New Pass Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content card" style={{ maxWidth: '480px' }}>
+            <div className="card-header">
+              <span className="card-title">
+                <AlertTriangle size={16} style={{ color: 'var(--alert-warning-border)' }} />
+                Confirm Active Pass Interruption
+              </span>
+              <button onClick={() => setShowConfirmModal(false)} className="close-btn" disabled={isCreatingPass}>
+                <X size={17} />
+              </button>
+            </div>
+            <div style={{ padding: '1rem 0', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                An orbital ground pass (<span className="mono bold">{passes.find(p => p.status === 'ACTIVE')?.passId || 'ACTIVE'}</span>) is currently in progress.
+              </p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                Initiating a new pass will mark the active pass as <strong style={{ color: 'var(--color-raspberry)' }}>INTERRUPTED</strong>, finalize its metrics, and archive all transmitted payload logs in history.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={isCreatingPass}
+                  className="btn btn-outline btn-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteNewPass}
+                  disabled={isCreatingPass}
+                  className="btn btn-primary btn-sm"
+                  style={{
+                    backgroundColor: 'var(--color-berry-rose)',
+                    borderColor: 'var(--color-berry-rose)',
+                    color: 'var(--text-inverse)'
+                  }}
+                >
+                  {isCreatingPass ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" /> Starting...
+                    </>
+                  ) : (
+                    'Confirm & Start New Pass'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .bold { font-weight: 700; color: var(--color-berry-rose); }

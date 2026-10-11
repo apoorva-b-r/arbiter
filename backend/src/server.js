@@ -41,20 +41,36 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ONLINE', mission: 'Arbiter Mission Control', timestamp: new Date().toISOString() });
 });
 
-// Database connection with fallback
+// Database connection with fallback and startup synchronization
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/arbiter';
 
-mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 8000 })
-  .then(() => {
+async function startServer() {
+  try {
+    await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 8000 });
     console.log(`[DB] MongoDB Connection Established Successfully to ${mongoose.connection.host}`);
-  })
-  .catch(err => {
+
+    // Synchronize persisted RouterSettings from MongoDB into in-memory router BEFORE simulator starts
+    if (settingsRoutes.syncSettingsFromDb) {
+      await settingsRoutes.syncSettingsFromDb();
+      console.log('[SETTINGS] Router settings synchronized from MongoDB at startup');
+    }
+  } catch (err) {
     console.warn(`[DB WARNING] Could not connect to local MongoDB (${err.message}). Falling back to In-Memory Simulator Data layer.`);
+  }
+
+  // Also hook into subsequent reconnects if MongoDB connects later
+  mongoose.connection.on('connected', async () => {
+    if (settingsRoutes.syncSettingsFromDb) {
+      await settingsRoutes.syncSettingsFromDb();
+    }
   });
 
-// Start simulator loop
-simulator.startSimulator();
+  // Start simulator loop AFTER settings are initialized
+  simulator.startSimulator();
 
-app.listen(PORT, () => {
-  console.log(`[SERVER] Arbiter Ground Station Express Backend active on port ${PORT}`);
-});
+  app.listen(PORT, () => {
+    console.log(`[SERVER] Arbiter Ground Station Express Backend active on port ${PORT}`);
+  });
+}
+
+startServer();

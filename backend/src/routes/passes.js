@@ -176,4 +176,15 @@ router.patch('/:passId/notes', async (req, res) => {
   }
 });
 
+// POST /api/passes -> initiate a new pass
+router.post('/', async (req, res) => {
+  try {
+    const newPass = await simulator.createNewPass('MANUAL');
+    return res.status(201).json(newPass);
+  } catch (err) {
+    console.error('Error creating new pass:', err);
+    return res.status(500).json({ error: 'Failed to create new pass.' });
+  }
+});
+
 module.exports = router;

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../api/client';
+import { api, request } from '../api/client';
 import { useDeploymentState } from '../hooks/useDeploymentState';
 import {
   MOCK_TELEMETRY,
@@ -94,6 +94,7 @@ export const TelemetryProvider = ({ children }) => {
 
   // Backend connection status state
   const [backendOnline, setBackendOnline] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // Global Mission Data State
   const [telemetry, setTelemetry] = useState(MOCK_TELEMETRY);
@@ -236,20 +237,51 @@ export const TelemetryProvider = ({ children }) => {
     setLastUpdated(now);
   };
 
-  // Initial load of pass history, scenarios, and validation runs from backend with fallback
+  // Initial load of pass history, scenarios, validation runs, and router settings from backend with fallback
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [fetchedPasses, fetchedScenarios, fetchedRuns] = await Promise.all([
+        const [fetchedPasses, fetchedScenarios, fetchedRuns, fetchedSettingsData] = await Promise.all([
           api.getPasses(),
           api.getScenarios(),
-          api.getValidationRuns()
+          api.getValidationRuns(),
+          request('/settings').catch((err) => {
+            console.warn('[TelemetryContext] Initial settings fetch warning (offline/fallback):', err);
+            return null;
+          })
         ]);
         if (Array.isArray(fetchedPasses)) setPasses(fetchedPasses);
         if (Array.isArray(fetchedScenarios)) setScenarios(fetchedScenarios);
         if (Array.isArray(fetchedRuns)) setValidationRuns(fetchedRuns);
+
+        if (fetchedSettingsData) {
+          const raw = fetchedSettingsData.settings || fetchedSettingsData;
+          const rawWeights = raw.baseWeights || raw.weights || {};
+          const mappedSettings = {
+            ...raw,
+            baseWeights: {
+              TTC: typeof rawWeights.TTC === 'number' ? rawWeights.TTC : 100,
+              SSTV: typeof rawWeights.SSTV === 'number' ? rawWeights.SSTV : 60,
+              Codec2: typeof rawWeights.Codec2 === 'number' ? rawWeights.Codec2 : 40,
+              M17: typeof rawWeights.M17 === 'number' ? rawWeights.M17 : 30
+            },
+            ttcStarvationTimeoutSec: typeof raw.ttcStarvationTimeoutSec === 'number'
+              ? raw.ttcStarvationTimeoutSec
+              : 120,
+            batteryThresholdLow: typeof raw.batteryThresholdLow === 'number'
+              ? raw.batteryThresholdLow
+              : 30
+          };
+          setSettings(mappedSettings);
+          setQueue(prevQueue => computePriorityQueue(prevQueue, telemetryRef.current, mappedSettings));
+          try {
+            localStorage.setItem('arbiter_router_settings', JSON.stringify(mappedSettings));
+          } catch (e) {}
+        }
       } catch (err) {
         console.warn('[TelemetryContext] Initial fetch warning:', err);
+      } finally {
+        setSettingsLoaded(true);
       }
     };
     fetchInitialData();
@@ -440,6 +472,66 @@ export const TelemetryProvider = ({ children }) => {
     } catch (e) {}
   };
 
+  const createNewPass = async () => {
+    try {
+      const newPass = await api.createPass();
+      if (newPass && newPass.passId) {
+        setPasses(prevPasses => {
+          const updated = prevPasses.map(p => {
+            if (p.status === 'ACTIVE' && p.passId !== newPass.passId) {
+              return {
+                ...p,
+                status: 'INTERRUPTED',
+                endTime: p.endTime === 'Active' ? new Date().toLocaleTimeString('en-GB', { hour12: false }) : p.endTime
+              };
+            }
+            return p;
+          });
+          if (!updated.some(p => p.passId === newPass.passId)) {
+            return [newPass, ...updated];
+          }
+          return updated;
+        });
+
+        setTelemetry(prev => ({
+          ...prev,
+          currentPassId: newPass.passId,
+          passStatus: 'ACTIVE',
+          passTimeRemainingSec: newPass.durationSec || 600
+        }));
+
+        setQueue(prevQueue => {
+          const resetQueue = prevQueue.map(item => {
+            if (item.type === 'TTC') {
+              return { ...item, waitTimeSec: 0, isStarved: false };
+            }
+            return item;
+          });
+          return computePriorityQueue(resetQueue, {
+            ...telemetryRef.current,
+            currentPassId: newPass.passId,
+            passStatus: 'ACTIVE'
+          }, settingsRef.current);
+        });
+
+        try {
+          const refreshedPasses = await api.getPasses();
+          if (Array.isArray(refreshedPasses) && refreshedPasses.length > 0) {
+            setPasses(refreshedPasses);
+          }
+        } catch (syncErr) {
+          // Retain optimistic update
+        }
+
+        return { success: true, pass: newPass };
+      }
+      return { success: false, error: 'Invalid pass response' };
+    } catch (err) {
+      console.error('Failed to create new pass:', err);
+      return { success: false, error: err.message || 'Failed to create new pass' };
+    }
+  };
+
   return (
     <TelemetryContext.Provider
       value={{
@@ -468,13 +560,15 @@ export const TelemetryProvider = ({ children }) => {
         triggerContingency,
         resolveContingencyAction,
         settings,
+        settingsLoaded,
         isPolling,
         setIsPolling,
         lastUpdated,
         issueOverride,
         runScenarioTest,
         addScenario,
-        saveRouterSettings
+        saveRouterSettings,
+        createNewPass
       }}
     >
       {children}
