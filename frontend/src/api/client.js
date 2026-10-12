@@ -248,5 +248,13 @@ export const api = {
       body: JSON.stringify({ username, password })
     });
     return data;
+  },
+
+  register: async (username, password) => {
+    const data = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+    return data;
   }
 };

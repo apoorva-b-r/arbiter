@@ -371,6 +371,21 @@ export const TelemetryProvider = ({ children }) => {
     }
   };
 
+  const register = async (username, password) => {
+    const trimmedUsername = username.trim();
+    const res = await api.register(trimmedUsername, password);
+
+    const userData = (res && res.user) ? res.user : {
+      username: (res && res.username) || trimmedUsername,
+      role: (res && res.role) || 'operator',
+      token: (res && res.token) || `token-${Date.now()}`
+    };
+
+    setUser(userData);
+    localStorage.setItem('arbiter_user', JSON.stringify(userData));
+    return { ok: true, user: userData };
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('arbiter_user');
@@ -537,6 +552,7 @@ export const TelemetryProvider = ({ children }) => {
       value={{
         user,
         login,
+        register,
         logout,
         backendOnline,
         telemetry,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTelemetry } from '../context/TelemetryContext';
 import { Satellite, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
@@ -112,6 +112,13 @@ export const Login = () => {
             <ArrowRight size={16} />
           </button>
         </form>
+
+        <div className="auth-footer" style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.85rem' }}>
+          <span style={{ color: 'var(--text-muted)' }}>New operator? </span>
+          <Link to="/signup" style={{ color: 'var(--color-berry-rose)', fontWeight: 600, textDecoration: 'none' }}>
+            Create an account
+          </Link>
+        </div>
       </div>
 
       <style>{`
