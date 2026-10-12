@@ -279,6 +279,77 @@ export const api = {
     return data;
   },
 
+  // Deployment Handover Audit Log API
+  createDeploymentRun: async (data) => {
+    return withFallback(async () => {
+      return await request('/deployment/runs', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    }, () => ({
+      success: true,
+      run: {
+        runId: `LOCAL-RUN-${Date.now()}`,
+        passId: data?.passId || 'LOCAL-DEMO',
+        currentState: 'STOWED',
+        status: 'IN_PROGRESS',
+        mode: data?.mode || 'NORMAL',
+        startTime: new Date().toISOString(),
+        isLocal: true
+      },
+      event: {
+        eventId: `LOCAL-EVT-${Date.now()}`,
+        eventType: 'SEQUENCE_STARTED',
+        state: 'STOWED',
+        message: 'Deployment handover launch sequence started (Local Fallback).',
+        timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
+        isLocal: true
+      }
+    }));
+  },
+
+  updateDeploymentRun: async (runId, data) => {
+    return withFallback(async () => {
+      return await request(`/deployment/runs/${runId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data)
+      });
+    }, () => ({ success: true, isLocal: true }));
+  },
+
+  addDeploymentEvent: async (runId, data) => {
+    return withFallback(async () => {
+      return await request(`/deployment/runs/${runId}/events`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    }, () => ({
+      eventId: `LOCAL-EVT-${Date.now()}`,
+      deploymentRunId: runId,
+      passId: data?.passId || 'LOCAL-DEMO',
+      ...data,
+      timestamp: data?.timestamp || (new Date().toTimeString().substring(0, 8) + ' UTC'),
+      isLocal: true
+    }));
+  },
+
+  getDeploymentRuns: async (passId) => {
+    return withFallback(async () => {
+      const q = passId ? `?passId=${encodeURIComponent(passId)}` : '';
+      return await request(`/deployment/runs${q}`);
+    }, []);
+  },
+
+  getDeploymentEvents: async (runId, passId) => {
+    return withFallback(async () => {
+      const params = new URLSearchParams();
+      if (runId) params.append('runId', runId);
+      if (passId) params.append('passId', passId);
+      const q = params.toString() ? `?${params.toString()}` : '';
+      return await request(`/deployment/events${q}`);
+    }, []);
+  },
+
   register: async (username, password) => {
     const data = await request('/auth/register', {
       method: 'POST',

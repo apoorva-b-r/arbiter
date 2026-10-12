@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { api } from '../api/client';
 
 export const DEPLOYMENT_STATES = [
   {
@@ -6,42 +7,48 @@ export const DEPLOYMENT_STATES = [
     step: 1,
     label: '1. Stowed',
     title: 'Stowed',
-    description: 'PocketQube contained in launch deployer pod. Awaiting launch vehicle deployment signal.'
+    description: 'PocketQube contained in launch deployer pod. Awaiting launch vehicle deployment signal.',
+    timeoutSec: 15
   },
   {
     id: 'RELEASE_TRIGGERED',
     step: 2,
     label: '2. Release Triggered',
     title: 'Release Triggered',
-    description: 'Pod deployment signal fired from launch vehicle. Spring mechanism activated. Satellite physically leaving pod.'
+    description: 'Pod deployment signal fired from launch vehicle. Spring mechanism activated. Satellite physically leaving pod.',
+    timeoutSec: 15
   },
   {
     id: 'SEPARATION_CONFIRMED',
     step: 3,
     label: '3. Separation Confirmed',
     title: 'Separation Confirmed',
-    description: 'Separation switch triggered and primary RF beacon received by ground control.'
+    description: 'Separation switch triggered and primary RF beacon received by ground control.',
+    timeoutSec: 15
   },
   {
     id: 'INITIALIZATION',
     step: 4,
     label: '4. Initialization',
     title: 'Initialization',
-    description: '30-minute silence period active. Onboard computer booting. Solar panels and antenna deployment in progress.'
+    description: '30-minute silence period active. Onboard computer booting. Solar panels and antenna deployment in progress.',
+    timeoutSec: 15
   },
   {
     id: 'COMMISSIONING',
     step: 5,
     label: '5. Commissioning',
     title: 'Commissioning',
-    description: 'Subsystem checkout underway: EPS, ADCS, TT&C, AI router. Radio beacon live on 437.500 MHz.'
+    description: 'Subsystem checkout underway: EPS, ADCS, TT&C, AI router. Radio beacon live on 437.500 MHz.',
+    timeoutSec: 15
   },
   {
     id: 'OPERATIONAL',
     step: 6,
     label: '6. Operational',
     title: 'Operational',
-    description: 'All systems nominal. Mission operations engaged. Handover to ground station complete.'
+    description: 'All systems nominal. Mission operations engaged. Handover to ground station complete.',
+    timeoutSec: 15
   }
 ];
 
@@ -64,7 +71,7 @@ export const VALID_TRANSITIONS = {
   OPERATIONAL: []
 };
 
-export const useDeploymentState = () => {
+export const useDeploymentState = ({ activePassId } = {}) => {
   const [actualStateIndex, setActualStateIndex] = useState(0);
   const [inspectedStateIndex, setInspectedStateIndex] = useState(null);
   
@@ -75,23 +82,40 @@ export const useDeploymentState = () => {
   
   // Timer & Retry state
   const [timeElapsedSec, setTimeElapsedSec] = useState(0);
-  const [timeoutDurationSec] = useState(SEPARATION_TIMEOUT);
   const [retryCount, setRetryCount] = useState(0);
   const [secondaryBeaconChecked, setSecondaryBeaconChecked] = useState(false);
   const [secondaryBeaconData, setSecondaryBeaconData] = useState(null);
 
+  // Persistence state
+  const [runs, setRuns] = useState([]);
+  const [currentRun, setCurrentRun] = useState(null);
+  const [selectedRunId, setSelectedRunId] = useState(null);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
   // History log timeline
   const [historyLogs, setHistoryLogs] = useState([
     {
+      eventId: 'INIT-EVT',
       timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
       event: 'System ready. Awaiting launch vehicle deployment command.',
       state: 'STOWED',
-      type: 'info'
+      type: 'info',
+      persisted: false
     }
   ]);
 
   const timersRef = useRef([]);
   const intervalRef = useRef(null);
+  const stateStartTimeRef = useRef(null);
+  const isContingencySimRef = useRef(false);
+  const actualStateIndexRef = useRef(0);
+  const currentRunIdRef = useRef(null);
+  const activePassIdRef = useRef(activePassId);
+
+  // Keep activePassIdRef up-to-date
+  useEffect(() => {
+    activePassIdRef.current = activePassId;
+  }, [activePassId]);
 
   const clearAllTimers = useCallback(() => {
     timersRef.current.forEach(t => clearTimeout(t));
@@ -100,45 +124,172 @@ export const useDeploymentState = () => {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    stateStartTimeRef.current = null;
+    isContingencySimRef.current = false;
+  }, []);
+
+  // Per-step elapsed timer: resets to 0s upon every state transition
+  const startElapsedTicker = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    stateStartTimeRef.current = Date.now();
+    setTimeElapsedSec(0);
+
+    intervalRef.current = setInterval(() => {
+      if (stateStartTimeRef.current) {
+        const elapsed = Math.floor((Date.now() - stateStartTimeRef.current) / 1000);
+        setTimeElapsedSec(elapsed);
+
+        if (isContingencySimRef.current && elapsed >= SEPARATION_TIMEOUT) {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          isContingencySimRef.current = false;
+          setContingencyActive(true);
+          setContingencyStatus('CONTINGENCY');
+          const msg = 'Separation confirmation timeout. Contingency protocol activated.';
+          setContingencyMessage(msg);
+          appendLog(
+            msg,
+            'RELEASE_TRIGGERED',
+            'warning',
+            { timeoutSec: SEPARATION_TIMEOUT },
+            'CONTINGENCY_ACTIVATED'
+          );
+        }
+      }
+    }, 1000);
   }, []);
 
   useEffect(() => {
     return () => clearAllTimers();
   }, [clearAllTimers]);
 
-  const appendLog = useCallback((event, stateId, type = 'info') => {
-    setHistoryLogs(prev => [
-      ...prev,
-      {
-        timestamp: new Date().toTimeString().substring(0, 8) + ' UTC',
-        event,
-        state: stateId,
-        type
+  // Load persistent history on mount or when activePassId changes
+  useEffect(() => {
+    let isMounted = true;
+    const loadHistory = async () => {
+      setIsHistoryLoading(true);
+      try {
+        const passId = activePassIdRef.current;
+        const [fetchedEvents, fetchedRuns] = await Promise.all([
+          api.getDeploymentEvents(null, passId),
+          api.getDeploymentRuns(passId)
+        ]);
+
+        if (!isMounted) return;
+
+        if (Array.isArray(fetchedRuns) && fetchedRuns.length > 0) {
+          setRuns(fetchedRuns);
+        }
+
+        if (Array.isArray(fetchedEvents) && fetchedEvents.length > 0) {
+          const mapped = fetchedEvents.map(e => ({
+            eventId: e.eventId,
+            runId: e.deploymentRunId,
+            passId: e.passId,
+            timestamp: e.timestamp,
+            event: e.message,
+            state: e.state,
+            type: e.logType || 'info',
+            metadata: e.metadata || {},
+            persisted: true
+          }));
+          setHistoryLogs(mapped);
+        }
+      } catch (err) {
+        console.warn('[useDeploymentState] Failed to fetch persistent history:', err);
+      } finally {
+        if (isMounted) setIsHistoryLoading(false);
       }
-    ]);
+    };
+
+    loadHistory();
+    return () => { isMounted = false; };
+  }, [activePassId]);
+
+  // Append log and persist event to backend asynchronously
+  const appendLog = useCallback((eventText, stateId, type = 'info', metadata = {}, eventType = 'STATE_TRANSITION', sourceState = null) => {
+    const nowStr = new Date().toTimeString().substring(0, 8) + ' UTC';
+    const localId = `LOCAL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const passId = activePassIdRef.current || 'UNASSIGNED';
+    const runId = currentRunIdRef.current || 'LOCAL-RUN';
+
+    const newLogItem = {
+      eventId: localId,
+      runId,
+      passId,
+      timestamp: nowStr,
+      event: eventText,
+      state: stateId,
+      type,
+      metadata,
+      persisted: Boolean(currentRunIdRef.current && !currentRunIdRef.current.startsWith('LOCAL-'))
+    };
+
+    setHistoryLogs(prev => [newLogItem, ...prev]);
+
+    // Send to backend if a valid run exists
+    if (currentRunIdRef.current && !currentRunIdRef.current.startsWith('LOCAL-')) {
+      api.addDeploymentEvent(currentRunIdRef.current, {
+        eventType,
+        sourceState,
+        destinationState: stateId,
+        state: stateId,
+        message: eventText,
+        logType: type,
+        metadata,
+        timestamp: nowStr
+      }).catch(err => {
+        console.warn('[useDeploymentState] Failed to persist deployment event:', err.message);
+      });
+    }
   }, []);
 
-  // Validate state transition using single source of truth matrix
-  const transitionToState = useCallback((targetIndex, eventText, logType = 'info') => {
-    setActualStateIndex(currentIdx => {
-      const currentState = DEPLOYMENT_STATES[currentIdx];
-      const targetState = DEPLOYMENT_STATES[targetIndex];
+  // Validate state transition and reset per-step timer synchronously
+  const transitionToState = useCallback((targetIndex, eventText, logType = 'info', eventType = 'STATE_TRANSITION') => {
+    const currentIdx = actualStateIndexRef.current;
+    const currentState = DEPLOYMENT_STATES[currentIdx];
+    const targetState = DEPLOYMENT_STATES[targetIndex];
 
-      if (!currentState || !targetState) return currentIdx;
+    if (!currentState || !targetState) return;
 
-      const allowedTargets = VALID_TRANSITIONS[currentState.id] || [];
-      if (!allowedTargets.includes(targetState.id) && currentIdx !== targetIndex) {
-        console.warn(`Invalid transition attempted: ${currentState.id} -> ${targetState.id}`);
-        return currentIdx;
+    const allowedTargets = VALID_TRANSITIONS[currentState.id] || [];
+    if (!allowedTargets.includes(targetState.id) && currentIdx !== targetIndex) {
+      console.warn(`Invalid transition attempted: ${currentState.id} -> ${targetState.id}`);
+      return;
+    }
+
+    actualStateIndexRef.current = targetIndex;
+    setActualStateIndex(targetIndex);
+
+    if (eventText) {
+      appendLog(eventText, targetState.id, logType, { from: currentState.id, to: targetState.id }, eventType, currentState.id);
+    }
+
+    // Reset per-step timer for the newly entered stage
+    if (targetIndex === 5) {
+      // Step 6: OPERATIONAL reached -> Completed
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
+      stateStartTimeRef.current = Date.now();
+      setTimeElapsedSec(0);
 
-      if (eventText) {
-        appendLog(eventText, targetState.id, logType);
+      if (currentRunIdRef.current && !currentRunIdRef.current.startsWith('LOCAL-')) {
+        api.updateDeploymentRun(currentRunIdRef.current, {
+          currentState: 'OPERATIONAL',
+          status: 'COMPLETED'
+        }).catch(() => {});
       }
-
-      return targetIndex;
-    });
-  }, [appendLog]);
+    } else {
+      startElapsedTicker();
+    }
+  }, [appendLog, startElapsedTicker]);
 
   // Inspection actions (NEVER alters actual state)
   const inspectState = useCallback((index) => {
@@ -152,13 +303,13 @@ export const useDeploymentState = () => {
   // Continue remaining sequence starting from SEPARATION_CONFIRMED (index 2)
   const resumeRemainingSequenceFromSeparation = useCallback(() => {
     const t1 = setTimeout(() => {
-      transitionToState(3, 'Onboard computer booted. Subsystem initialization started.', 'info');
+      transitionToState(3, 'Onboard computer booted. Subsystem initialization started.', 'info', 'INITIALIZATION_STARTED');
       
       const t2 = setTimeout(() => {
-        transitionToState(4, 'Initialization complete. Subsystem commissioning engaged.', 'info');
+        transitionToState(4, 'Initialization complete. Subsystem commissioning engaged.', 'info', 'COMMISSIONING_STARTED');
         
         const t3 = setTimeout(() => {
-          transitionToState(5, 'Satellite reached Operational state.', 'success');
+          transitionToState(5, 'Satellite reached Operational state. Handover complete.', 'success', 'OPERATIONAL_HANDOVER');
         }, DEPLOYMENT_TIMINGS.commissionToOperational);
         timersRef.current.push(t3);
 
@@ -170,10 +321,11 @@ export const useDeploymentState = () => {
   }, [transitionToState]);
 
   // DEMO 1: Run Launch Sequence Demo (Normal path)
-  const runLaunchSequenceDemo = useCallback(() => {
+  const runLaunchSequenceDemo = useCallback(async () => {
     clearAllTimers();
     setInspectedStateIndex(null);
     setActualStateIndex(0);
+    actualStateIndexRef.current = 0;
     setContingencyActive(false);
     setContingencyStatus('NORMAL');
     setContingencyMessage('');
@@ -182,15 +334,32 @@ export const useDeploymentState = () => {
     setSecondaryBeaconChecked(false);
     setSecondaryBeaconData(null);
 
-    appendLog('Deployment sequence started.', 'STOWED', 'info');
+    // Create a new persistent deployment run
+    const passId = activePassIdRef.current || 'UNASSIGNED';
+    let runData = null;
+    try {
+      const res = await api.createDeploymentRun({ passId, mode: 'NORMAL' });
+      if (res && res.run) {
+        runData = res.run;
+        currentRunIdRef.current = res.run.runId;
+        setCurrentRun(res.run);
+        setRuns(prev => [res.run, ...prev.filter(r => r.runId !== res.run.runId)]);
+      }
+    } catch (e) {
+      console.warn('[useDeploymentState] Failed to create persistent run:', e);
+      currentRunIdRef.current = `LOCAL-RUN-${Date.now()}`;
+    }
+
+    appendLog('Deployment sequence started.', 'STOWED', 'info', { passId }, 'SEQUENCE_STARTED');
+    startElapsedTicker();
 
     // 1. STOWED -> RELEASE_TRIGGERED
     const t1 = setTimeout(() => {
-      transitionToState(1, 'Transitioned to Release Triggered.', 'info');
+      transitionToState(1, 'Transitioned to Release Triggered.', 'info', 'STATE_TRANSITION');
 
       // 2. RELEASE_TRIGGERED -> SEPARATION_CONFIRMED
       const t2 = setTimeout(() => {
-        transitionToState(2, 'Separation confirmation received.', 'success');
+        transitionToState(2, 'Separation confirmation received.', 'success', 'SEPARATION_CONFIRMED');
 
         // 3 -> 4 -> 5
         resumeRemainingSequenceFromSeparation();
@@ -200,13 +369,14 @@ export const useDeploymentState = () => {
 
     }, DEPLOYMENT_TIMINGS.stowedToRelease);
     timersRef.current.push(t1);
-  }, [clearAllTimers, appendLog, transitionToState, resumeRemainingSequenceFromSeparation]);
+  }, [clearAllTimers, appendLog, transitionToState, resumeRemainingSequenceFromSeparation, startElapsedTicker]);
 
-  // DEMO 3: Simulate Timeout Contingency (Failure path - 100% Frontend simulation)
-  const runTimeoutContingency = useCallback(() => {
+  // DEMO 2: Simulate Timeout Contingency (Failure path)
+  const runTimeoutContingency = useCallback(async () => {
     clearAllTimers();
     setInspectedStateIndex(null);
     setActualStateIndex(0);
+    actualStateIndexRef.current = 0;
     setContingencyActive(false);
     setContingencyStatus('NORMAL');
     setContingencyMessage('');
@@ -215,62 +385,51 @@ export const useDeploymentState = () => {
     setSecondaryBeaconChecked(false);
     setSecondaryBeaconData(null);
 
-    appendLog('Deployment sequence started.', 'STOWED', 'info');
+    // Create a new persistent deployment run with CONTINGENCY_SIMULATION mode
+    const passId = activePassIdRef.current || 'UNASSIGNED';
+    try {
+      const res = await api.createDeploymentRun({ passId, mode: 'CONTINGENCY_SIMULATION' });
+      if (res && res.run) {
+        currentRunIdRef.current = res.run.runId;
+        setCurrentRun(res.run);
+        setRuns(prev => [res.run, ...prev.filter(r => r.runId !== res.run.runId)]);
+      }
+    } catch (e) {
+      console.warn('[useDeploymentState] Failed to create persistent contingency run:', e);
+      currentRunIdRef.current = `LOCAL-RUN-${Date.now()}`;
+    }
 
-    // STOWED -> RELEASE_TRIGGERED
+    appendLog('Deployment contingency simulation started.', 'STOWED', 'info', { passId }, 'SEQUENCE_STARTED');
+    startElapsedTicker();
+
+    // STOWED -> RELEASE_TRIGGERED after 2s
     const t1 = setTimeout(() => {
-      transitionToState(1, 'Transitioned to Release Triggered.', 'info');
+      isContingencySimRef.current = true;
+      transitionToState(1, 'Transitioned to Release Triggered.', 'info', 'STATE_TRANSITION');
       
       setContingencyStatus('WAITING_CONFIRMATION');
-      appendLog('Waiting for separation confirmation.', 'RELEASE_TRIGGERED', 'info');
-      setTimeElapsedSec(0);
-
-      // Start 1-second interval timer for frontend simulation
-      intervalRef.current = setInterval(() => {
-        setTimeElapsedSec(prev => {
-          const nextTime = prev + 1;
-          if (nextTime >= SEPARATION_TIMEOUT) {
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-              intervalRef.current = null;
-            }
-            // Halt sequence & activate local contingency protocol
-            setContingencyActive(true);
-            setContingencyStatus('CONTINGENCY');
-            const msg = 'Separation confirmation timeout. Contingency protocol activated.';
-            setContingencyMessage(msg);
-            appendLog(msg, 'RELEASE_TRIGGERED', 'warning');
-          }
-          return nextTime;
-        });
-      }, 1000);
-
+      appendLog('Waiting for separation confirmation.', 'RELEASE_TRIGGERED', 'info', { timeoutSec: SEPARATION_TIMEOUT }, 'STATE_ENTRY');
     }, 2000);
     timersRef.current.push(t1);
-  }, [clearAllTimers, appendLog, transitionToState]);
+  }, [clearAllTimers, appendLog, transitionToState, startElapsedTicker]);
 
-  // Contingency Action 1: Retry Verification (Explicit simulated confirmation response)
+  // Contingency Action 1: Retry Verification
   const retryVerification = useCallback(() => {
     setRetryCount(prev => {
       const nextAttempt = prev + 1;
       
       if (nextAttempt === 1) {
-        // Attempt 1 fails (Simulated confirmation unavailable)
-        appendLog('Verification retry #1 initiated.', 'RELEASE_TRIGGERED', 'info');
+        appendLog('Verification retry #1 initiated: separation confirmation unavailable.', 'RELEASE_TRIGGERED', 'warning', { attempt: 1 }, 'CONTINGENCY_RETRY');
         const msg = 'Verification retry #1 failed: separation confirmation unavailable.';
         setContingencyMessage(msg);
-        appendLog(msg, 'RELEASE_TRIGGERED', 'warning');
       } else {
-        // Attempt 2+ succeeds (Simulated confirmation received)
         clearAllTimers();
-        appendLog('Verification retry #2 initiated.', 'RELEASE_TRIGGERED', 'info');
-        appendLog('Verification retry #2 succeeded: separation confirmed.', 'SEPARATION_CONFIRMED', 'success');
+        appendLog('Verification retry #2 initiated and succeeded: separation confirmed.', 'SEPARATION_CONFIRMED', 'success', { attempt: 2 }, 'CONTINGENCY_RETRY');
         setContingencyActive(false);
         setContingencyStatus('RESOLVED');
         setContingencyMessage('');
         
-        transitionToState(2, 'Separation confirmation received.', 'success');
-        appendLog('Normal deployment sequence resumed.', 'SEPARATION_CONFIRMED', 'info');
+        transitionToState(2, 'Separation confirmation received.', 'success', 'CONTINGENCY_RESOLVED');
         resumeRemainingSequenceFromSeparation();
       }
       return nextAttempt;
@@ -280,45 +439,46 @@ export const useDeploymentState = () => {
   // Contingency Action 2: Check Secondary Beacon
   const checkSecondaryBeacon = useCallback(() => {
     setSecondaryBeaconChecked(true);
-    setSecondaryBeaconData({
+    const beaconMeta = {
       beacon: 'DETECTED (-84 dBm)',
       rfCarrier: 'PRESENT',
       battery: 'HEALTHY (84.5%)',
-      note: 'Secondary evidence detected. Formal separation confirmation switch is still unconfirmed.'
-    });
-    appendLog('Secondary beacon check initiated.', 'RELEASE_TRIGGERED', 'info');
-    appendLog('Secondary beacon detected, RF carrier present, EPS telemetry healthy.', 'RELEASE_TRIGGERED', 'info');
+      note: 'Secondary evidence detected. Formal separation switch unconfirmed.'
+    };
+    setSecondaryBeaconData(beaconMeta);
+    appendLog('Secondary beacon check initiated: RF carrier detected (-84 dBm), battery healthy.', 'RELEASE_TRIGGERED', 'info', beaconMeta, 'SECONDARY_BEACON_CHECK');
   }, [appendLog]);
 
-  // Contingency Action 3: Escalate to Mission Director (Terminal until operator intervention)
+  // Contingency Action 3: Escalate to Mission Director
   const escalateContingency = useCallback(() => {
     clearAllTimers();
     setContingencyStatus('ESCALATED');
     const msg = 'Deployment confirmation unavailable: contingency escalated to Mission Director.';
     setContingencyMessage(msg);
-    appendLog(msg, 'RELEASE_TRIGGERED', 'warning');
+    appendLog(msg, 'RELEASE_TRIGGERED', 'critical', { action: 'ESCALATE' }, 'CONTINGENCY_ESCALATED');
   }, [clearAllTimers, appendLog]);
 
-  // Contingency Action 4: Manually Confirm Separation (Operator override)
+  // Contingency Action 4: Manually Confirm Separation
   const manualConfirmSeparation = useCallback(() => {
     clearAllTimers();
     setContingencyActive(false);
     setContingencyStatus('RESOLVED');
     setContingencyMessage('');
-    appendLog('Operator manually confirmed separation based on available evidence.', 'SEPARATION_CONFIRMED', 'success');
+    appendLog('Operator manually confirmed separation based on available evidence.', 'SEPARATION_CONFIRMED', 'success', { action: 'MANUAL_OVERRIDE' }, 'MANUAL_SEPARATION_CONFIRMED');
     
-    transitionToState(2, 'Separation confirmation received.', 'success');
-    appendLog('Normal deployment sequence resumed.', 'SEPARATION_CONFIRMED', 'info');
+    transitionToState(2, 'Separation confirmation received.', 'success', 'CONTINGENCY_RESOLVED');
     resumeRemainingSequenceFromSeparation();
   }, [clearAllTimers, appendLog, transitionToState, resumeRemainingSequenceFromSeparation]);
 
-  // Backwards compatible manual state transition (for direct clicks if valid)
+  // Backwards compatible manual state transition
   const transitionDeploymentState = useCallback((targetIndex) => {
-    transitionToState(targetIndex, `Operator set state to: ${DEPLOYMENT_STATES[targetIndex]?.label}`, 'info');
+    transitionToState(targetIndex, `Operator set state to: ${DEPLOYMENT_STATES[targetIndex]?.label}`, 'info', 'STATE_TRANSITION');
   }, [transitionToState]);
 
+  // Active step's configured timeout duration (per-step timeout)
+  const currentTimeoutDurationSec = DEPLOYMENT_STATES[actualStateIndex]?.timeoutSec || SEPARATION_TIMEOUT;
+
   return {
-    // Current deployment state object matching existing UI expectations
     deployment: {
       currentStateIndex: actualStateIndex,
       inspectedStateIndex,
@@ -326,14 +486,18 @@ export const useDeploymentState = () => {
       contingencyActive,
       contingencyStatus,
       contingencyMessage,
-      timeoutDurationSec,
+      timeoutDurationSec: currentTimeoutDurationSec,
       timeElapsedSec,
       retryCount,
       secondaryBeaconChecked,
       secondaryBeaconData,
-      historyLogs
+      historyLogs,
+      runs,
+      currentRun,
+      selectedRunId,
+      isHistoryLoading,
+      activePassId: activePassIdRef.current || 'UNASSIGNED'
     },
-    // State machine actions
     actualStateIndex,
     inspectedStateIndex,
     inspectState,
@@ -345,12 +509,13 @@ export const useDeploymentState = () => {
     escalateContingency,
     manualConfirmSeparation,
     transitionDeploymentState,
+    setSelectedRunId,
     triggerContingency: (reason) => {
       clearAllTimers();
       setContingencyActive(true);
       setContingencyStatus('CONTINGENCY');
       setContingencyMessage(reason || 'Separation confirmation timeout. Contingency protocol activated.');
-      appendLog(reason || 'Separation confirmation timeout. Contingency protocol activated.', DEPLOYMENT_STATES[actualStateIndex]?.id, 'warning');
+      appendLog(reason || 'Separation confirmation timeout. Contingency protocol activated.', DEPLOYMENT_STATES[actualStateIndex]?.id, 'warning', {}, 'CONTINGENCY_ACTIVATED');
     },
     resolveContingencyAction: (action) => {
       if (action === 'RETRY') retryVerification();

@@ -51,35 +51,68 @@ export const Deployment = () => {
 
         {/* State Transition Log Timeline */}
         <div className="card transition-history-panel">
-          <div className="card-header">
+          <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
             <span className="card-title">
               <Clock size={16} style={{ color: 'var(--accent-purple)' }} />
               Handover Event & State Transition History Log
             </span>
-            <span className="badge badge-purple mono">{deployment.historyLogs.length} EVENTS</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span className="badge badge-blue mono" title="Associated Ground Pass ID">
+                PASS: {deployment.activePassId || 'UNASSIGNED'}
+              </span>
+              {deployment.currentRun?.runId && (
+                <span className="badge badge-purple mono" title="Current Deployment Run ID">
+                  RUN: {deployment.currentRun.runId}
+                </span>
+              )}
+              <span className="badge badge-purple mono">
+                {deployment.isHistoryLoading ? 'SYNCING...' : `${deployment.historyLogs.length} EVENTS`}
+              </span>
+            </div>
           </div>
 
           <div className="timeline-list">
-            {deployment.historyLogs.map((log, idx) => (
-              <div key={idx} className="timeline-item">
-                <div className="timeline-marker">
-                  {log.type === 'warning' ? (
-                    <ShieldAlert size={16} style={{ color: 'var(--alert-warning-border)' }} />
-                  ) : log.type === 'success' ? (
-                    <CheckCircle2 size={16} style={{ color: 'var(--alert-success-border)' }} />
-                  ) : (
-                    <Clock size={16} style={{ color: 'var(--color-berry-rose)' }} />
-                  )}
-                </div>
-                <div className="timeline-body">
-                  <div className="timeline-meta">
-                    <span className="mono text-muted text-xs">{log.timestamp}</span>
-                    <span className="badge badge-blue mono">{log.state}</span>
-                  </div>
-                  <p className="timeline-event mono">{log.event}</p>
-                </div>
+            {deployment.historyLogs.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }} className="mono text-sm">
+                No handover event logs recorded yet.
               </div>
-            ))}
+            ) : (
+              deployment.historyLogs.map((log, idx) => (
+                <div key={log.eventId || idx} className="timeline-item">
+                  <div className="timeline-marker">
+                    {log.type === 'warning' ? (
+                      <ShieldAlert size={16} style={{ color: 'var(--alert-warning-border)' }} />
+                    ) : log.type === 'success' ? (
+                      <CheckCircle2 size={16} style={{ color: 'var(--alert-success-border)' }} />
+                    ) : log.type === 'critical' ? (
+                      <ShieldAlert size={16} style={{ color: 'var(--color-raspberry)' }} />
+                    ) : (
+                      <Clock size={16} style={{ color: 'var(--color-berry-rose)' }} />
+                    )}
+                  </div>
+                  <div className="timeline-body">
+                    <div className="timeline-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span className="mono text-muted text-xs">{log.timestamp}</span>
+                      <span className="badge badge-blue mono">{log.state}</span>
+                      {log.passId && log.passId !== 'UNASSIGNED' && (
+                        <span className="mono text-muted text-xs" style={{ opacity: 0.8 }}>
+                          [{log.passId}]
+                        </span>
+                      )}
+                      {log.persisted !== undefined && (
+                        <span
+                          className={`badge ${log.persisted ? 'badge-green' : 'badge-amber'} mono`}
+                          style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}
+                        >
+                          {log.persisted ? 'PERSISTED' : 'LOCAL'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="timeline-event mono">{log.event}</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
