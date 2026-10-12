@@ -5,6 +5,17 @@ import { Sliders, Save, CheckCircle, RotateCcw } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
+function getAuthHeaders() {
+  try {
+    const raw = sessionStorage.getItem('arbiter_user');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed?.token ? { 'Authorization': `Bearer ${parsed.token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 const DEFAULT_SETTINGS = {
   baseWeights: { TTC: 100, SSTV: 60, Codec2: 40, M17: 30 },
   ttcStarvationTimeoutSec: 120,
@@ -112,7 +123,7 @@ export const Settings = () => {
     let isMounted = true;
     const loadSettings = async () => {
       try {
-        const res = await fetch(`${API}/settings`);
+        const res = await fetch(`${API}/settings`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!isMounted) return;
@@ -187,7 +198,7 @@ export const Settings = () => {
     try {
       const res = await fetch(`${API}/settings`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(payload)
       });
 
@@ -256,7 +267,7 @@ export const Settings = () => {
     try {
       const res = await fetch(`${API}/settings/reset`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
       });
 
       if (!res.ok) {

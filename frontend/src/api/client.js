@@ -10,9 +10,23 @@ import {
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
+function getStoredToken() {
+  try {
+    const raw = sessionStorage.getItem('arbiter_user');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.token || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function request(path, options = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  const token = getStoredToken();
+  const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
 
   try {
     const res = await fetch(`${BASE}${path}`, {
@@ -20,6 +34,7 @@ export async function request(path, options = {}) {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        ...authHeaders,
         ...(options.headers || {})
       },
       signal: controller.signal
@@ -29,6 +44,17 @@ export async function request(path, options = {}) {
       const errorData = await res.json().catch(() => ({}));
       const error = new Error(errorData.error || errorData.message || `HTTP error! status: ${res.status}`);
       error.status = res.status;
+
+      if (res.status === 401 && !path.startsWith('/auth')) {
+        try {
+          sessionStorage.removeItem('arbiter_user');
+          localStorage.removeItem('arbiter_user');
+        } catch (_) {}
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
+
       throw error;
     }
 
@@ -49,6 +75,9 @@ export async function withFallback(apiCall, mockValue) {
   try {
     return await apiCall();
   } catch (err) {
+    if (err && err.status === 401) {
+      throw err;
+    }
     console.warn('[API] backend offline, using mock', err);
     return typeof mockValue === 'function' ? mockValue() : mockValue;
   }

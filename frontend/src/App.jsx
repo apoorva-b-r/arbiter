@@ -60,6 +60,15 @@ const PublicRoute = ({ children }) => {
 
 
 // ---------------------------------------------------------
+// Redirect landing and unknown paths: /dashboard if logged in, /login if logged out
+// ---------------------------------------------------------
+const RootRedirect = () => {
+  const { user } = useTelemetry();
+  return <Navigate to={user ? "/dashboard" : "/login"} replace />;
+};
+
+
+// ---------------------------------------------------------
 // Application
 // ---------------------------------------------------------
 export function App() {
@@ -163,21 +172,21 @@ export function App() {
 
           {/* -------------------------------------------------
               ROOT
-              First page of the application = LOGIN
+              Landing page: /dashboard if logged in, /login if logged out
           ------------------------------------------------- */}
           <Route
             path="/"
-            element={<Navigate to="/login" replace />}
+            element={<RootRedirect />}
           />
 
 
           {/* -------------------------------------------------
               UNKNOWN URLS
-              Also send the user to LOGIN
+              Redirect: /dashboard if logged in, /login if logged out
           ------------------------------------------------- */}
           <Route
             path="*"
-            element={<Navigate to="/login" replace />}
+            element={<RootRedirect />}
           />
 
         </Routes>

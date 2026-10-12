@@ -26,7 +26,7 @@ router.post('/login', async (req, res) => {
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       return res.status(401).json({
-        error: 'Invalid operator ID or passcode'
+        error: 'Incorrect Operator ID or passcode'
       });
     }
 

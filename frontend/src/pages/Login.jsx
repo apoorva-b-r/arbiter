@@ -10,18 +10,22 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({ username: '', password: '' });
+  const [generalError, setGeneralError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setGeneralError('');
 
     const nextErrors = { username: '', password: '' };
     const trimmedUsername = username.trim();
+    const usernameRegex = /^[a-zA-Z0-9_-]{3,20}$/;
 
-    if (!trimmedUsername) {
-      nextErrors.username = 'Please fill in the username.';
+    if (!trimmedUsername || !usernameRegex.test(trimmedUsername)) {
+      nextErrors.username = 'Invalid Operator ID format';
     }
+
     if (!password) {
-      nextErrors.password = 'Please fill in the password.';
+      nextErrors.password = 'Passcode is required';
     }
 
     if (nextErrors.username || nextErrors.password) {
@@ -33,13 +37,12 @@ export const Login = () => {
 
     if (result.ok) {
       setErrors({ username: '', password: '' });
+      setGeneralError('');
       navigate('/dashboard', { replace: true });
       return;
     }
 
-    if (!result.usernameOk) nextErrors.username = 'Incorrect Operator ID.';
-    if (!result.passwordOk) nextErrors.password = 'Incorrect password entered.';
-    setErrors(nextErrors);
+    setGeneralError(result.error || 'Incorrect Operator ID or passcode');
   };
 
   return (
@@ -66,6 +69,7 @@ export const Login = () => {
                 onChange={(e) => {
                   setUsername(e.target.value);
                   if (errors.username) setErrors((prev) => ({ ...prev, username: '' }));
+                  if (generalError) setGeneralError('');
                 }}
                 autoComplete="username"
                 required
@@ -88,6 +92,7 @@ export const Login = () => {
                 onChange={(e) => {
                   setPassword(e.target.value);
                   if (errors.password) setErrors((prev) => ({ ...prev, password: '' }));
+                  if (generalError) setGeneralError('');
                 }}
                 autoComplete="current-password"
                 required
@@ -106,6 +111,12 @@ export const Login = () => {
               <p className="field-error" role="alert">{errors.password}</p>
             )}
           </div>
+
+          {generalError && (
+            <p className="login-general-error" role="alert">
+              {generalError}
+            </p>
+          )}
 
           <button type="submit" className="btn btn-primary login-submit-btn">
             <span>Login</span>
@@ -219,6 +230,18 @@ export const Login = () => {
           color: #dc2626;
           font-size: 0.78rem;
           font-weight: 600;
+        }
+
+        .login-general-error {
+          margin: 0.25rem 0 0.85rem;
+          color: #dc2626;
+          font-size: 0.82rem;
+          font-weight: 600;
+          text-align: center;
+          background-color: #FEF2F2;
+          border: 1px solid #FCA5A5;
+          padding: 0.55rem 0.75rem;
+          border-radius: 8px;
         }
 
         .login-submit-btn {

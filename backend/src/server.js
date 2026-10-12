@@ -17,6 +17,7 @@ const passRoutes = require('./routes/passes');
 const validationRoutes = require('./routes/validation');
 const deploymentRoutes = require('./routes/deployment');
 const settingsRoutes = require('./routes/settings');
+const requireAuth = require('./middleware/requireAuth');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -26,14 +27,14 @@ app.use(cors());
 app.use(express.json());
 
 // API Routes
-app.use('/api/telemetry', telemetryRoutes);
-app.use('/api/queue', queueRoutes);
-app.use('/api/decisions', decisionRoutes);
-app.use('/api/override', overrideRoutes);
-app.use('/api/passes', passRoutes);
-app.use('/api/validation', validationRoutes);
-app.use('/api/deployment', deploymentRoutes);
-app.use('/api/settings', settingsRoutes);
+app.use('/api/telemetry', requireAuth, telemetryRoutes);
+app.use('/api/queue', requireAuth, queueRoutes);
+app.use('/api/decisions', requireAuth, decisionRoutes);
+app.use('/api/override', requireAuth, overrideRoutes);
+app.use('/api/passes', requireAuth, passRoutes);
+app.use('/api/validation', requireAuth, validationRoutes);
+app.use('/api/deployment', requireAuth, deploymentRoutes);
+app.use('/api/settings', requireAuth, settingsRoutes);
 app.use('/api/auth', require('./routes/auth'));
 
 // Health check endpoint

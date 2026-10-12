@@ -83,13 +83,51 @@ export const processDecisions = (decisionsList) => {
   });
 };
 
+function isTokenExpired(token) {
+  if (!token || typeof token !== 'string') return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const payload = JSON.parse(jsonPayload);
+    if (payload && payload.exp) {
+      return Date.now() >= payload.exp * 1000;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 const TelemetryContext = createContext(null);
 
 export const TelemetryProvider = ({ children }) => {
-  // Auth state
+  // Auth state - stored in sessionStorage (key: arbiter_user) so closing browser logs out
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('arbiter_user');
-    return saved ? JSON.parse(saved) : null;
+    // Clean up any legacy localStorage session on app start
+    try {
+      localStorage.removeItem('arbiter_user');
+    } catch (_) {}
+
+    try {
+      const saved = sessionStorage.getItem('arbiter_user');
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.token && isTokenExpired(parsed.token)) {
+        sessionStorage.removeItem('arbiter_user');
+        return null;
+      }
+      return parsed;
+    } catch (_) {
+      return null;
+    }
   });
 
   // Backend connection status state
@@ -336,38 +374,53 @@ export const TelemetryProvider = ({ children }) => {
       // Backend returned 200 OK
       const userData = (res && res.user) ? res.user : {
         username: (res && res.username) || trimmedUsername,
+        role: (res && res.role) || 'operator',
         token: (res && res.token) || `token-${Date.now()}`
       };
 
       setUser(userData);
-      localStorage.setItem('arbiter_user', JSON.stringify(userData));
-      return { ok: true, usernameOk: true, passwordOk: true };
+      sessionStorage.setItem('arbiter_user', JSON.stringify(userData));
+      return { ok: true };
     } catch (err) {
-      // 401 Unauthorized -> invalid credentials error
+      // 401: Wrong credentials (username not found or password incorrect)
       if (err && err.status === 401) {
-        return { ok: false, usernameOk: true, passwordOk: false };
+        return { ok: false, error: 'Incorrect Operator ID or passcode' };
       }
 
-      // 404 Route Not Found or Network error -> fallback to local credential check
+      // 503: Database offline
+      if (err && err.status === 503) {
+        return { ok: false, error: 'Database offline — try again' };
+      }
+
+      // 400: Bad request
+      if (err && err.status === 400) {
+        return { ok: false, error: err.message || 'Operator ID and passcode are required.' };
+      }
+
+      // If backend returned other HTTP errors (e.g. 500), return error message without mock fallback
+      if (err && err.status && typeof err.status === 'number' && err.status !== 408) {
+        return { ok: false, error: err.message || 'Server error. Please try again.' };
+      }
+
+      // Backend completely unreachable (network error or timeout): fallback to local credential check
       const validUsername = 'Operator-Alpha';
       const validPassword = 'Arbiter2026!';
 
-      const usernameOk = trimmedUsername === validUsername;
-      const passwordOk = password === validPassword;
-
-      if (!usernameOk || !passwordOk) {
-        return { ok: false, usernameOk, passwordOk };
+      const matches = trimmedUsername === validUsername && password === validPassword;
+      if (!matches) {
+        return { ok: false, error: 'Incorrect Operator ID or passcode' };
       }
 
       const userData = {
         username: validUsername,
+        role: 'operator',
         token: `token-${Date.now()}`
       };
 
       setUser(userData);
-      localStorage.setItem('arbiter_user', JSON.stringify(userData));
+      sessionStorage.setItem('arbiter_user', JSON.stringify(userData));
 
-      return { ok: true, usernameOk: true, passwordOk: true };
+      return { ok: true };
     }
   };
 
@@ -382,13 +435,16 @@ export const TelemetryProvider = ({ children }) => {
     };
 
     setUser(userData);
-    localStorage.setItem('arbiter_user', JSON.stringify(userData));
+    sessionStorage.setItem('arbiter_user', JSON.stringify(userData));
     return { ok: true, user: userData };
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('arbiter_user');
+    try {
+      sessionStorage.removeItem('arbiter_user');
+      localStorage.removeItem('arbiter_user');
+    } catch (_) {}
   };
 
   const issueOverride = async (mode) => {
