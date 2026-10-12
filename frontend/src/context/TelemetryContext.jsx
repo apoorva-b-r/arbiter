@@ -389,7 +389,7 @@ export const TelemetryProvider = ({ children }) => {
 
       // 503: Database offline
       if (err && err.status === 503) {
-        return { ok: false, error: 'Database offline — try again' };
+        return { ok: false, error: 'Database offline. Try again.' };
       }
 
       // 400: Bad request

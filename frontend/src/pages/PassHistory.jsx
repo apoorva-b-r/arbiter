@@ -259,7 +259,7 @@ export const PassHistory = () => {
             <div className="modal-content card">
               <div className="card-header">
                 <span className="card-title">
-                  Pass Decision Log Breakdown — {selectedPass.passId}
+                  Pass Decision Log Breakdown: {selectedPass.passId}
                 </span>
                 <button onClick={() => setSelectedPass(null)} className="close-btn">
                   <X size={17} />
@@ -411,7 +411,7 @@ export const PassHistory = () => {
                     {overrideCount === 0 && (
                       <div className="auto-pass-notice mono text-xs">
                         <CheckCircle2 size={13} style={{ color: 'var(--alert-success-border)' }} />
-                        All decisions were automatic — no operator overrides during this pass.
+                        All decisions were automatic, no operator overrides during this pass.
                       </div>
                     )}
                   </>

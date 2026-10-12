@@ -333,7 +333,7 @@ export const MOCK_DEPLOYMENT_STATE = {
   currentStateIndex: 0,
   states: [
     { id: 'STOWED', label: '1. Stowed', description: 'PocketQube contained in launch deployer pod. Awaiting launch vehicle deployment signal.' },
-    { id: 'RELEASE_TRIGGERED', label: '2. Release Triggered', description: 'Pod deployment signal fired from launch vehicle. Spring mechanism activated — satellite physically leaving pod.' },
+    { id: 'RELEASE_TRIGGERED', label: '2. Release Triggered', description: 'Pod deployment signal fired from launch vehicle. Spring mechanism activated. Satellite physically leaving pod.' },
     { id: 'SEPARATION_CONFIRMED', label: '3. Separation Confirmed', description: 'Awaiting confirmation signal from satellite. First RF beacon expected within timeout window.' },
     { id: 'INITIALIZATION', label: '4. Initialization', description: '30-minute silence period active. Onboard computer booting. Solar panels and antenna deployment in progress.' },
     { id: 'COMMISSIONING', label: '5. Commissioning', description: 'Subsystem checkout underway: EPS, ADCS, TT&C, AI router. Radio beacon live on 437.500 MHz.' },
@@ -344,7 +344,7 @@ export const MOCK_DEPLOYMENT_STATE = {
   timeoutDurationSec: 15,
   timeElapsedSec: 0,
   historyLogs: [
-    { timestamp: '—', event: 'SYSTEM READY — AWAITING LAUNCH VEHICLE DEPLOYMENT COMMAND', state: 'STOWED', type: 'info' }
+    { timestamp: '--', event: 'SYSTEM READY: AWAITING LAUNCH VEHICLE DEPLOYMENT COMMAND', state: 'STOWED', type: 'info' }
   ]
 };
 

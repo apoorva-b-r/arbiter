@@ -30,7 +30,7 @@ export const Signup = () => {
     if (!trimmedUsername) {
       nextErrors.username = 'Operator ID is required.';
     } else if (!usernameRegex.test(trimmedUsername)) {
-      nextErrors.username = 'Operator ID must be 3–20 characters and contain only letters, numbers, hyphens, and underscores.';
+      nextErrors.username = 'Operator ID must be 3-20 characters and contain only letters, numbers, hyphens, and underscores.';
     }
 
     if (!password) {
@@ -91,7 +91,7 @@ export const Signup = () => {
             <Satellite size={28} strokeWidth={1.8} />
           </div>
           <h1 className="login-title">ARBITER</h1>
-          <p className="login-subtitle">PocketQube Ground Station Mission Control — New Operator Registration</p>
+          <p className="login-subtitle">PocketQube Ground Station Mission Control: New Operator Registration</p>
         </div>
 
         {serverError && (

@@ -1,4 +1,4 @@
-# Arbiter — Ground Station Simulator
+# Arbiter: Ground Station Simulator
 
 **Arbiter** is a full-stack web application designed for simulating a PocketQube satellite ground station mission. It features satellite telemetry monitoring, an AI rule-based priority scheduler with safety fallbacks for ground pass payload data transmission, an **AI safety validation console**, and a **deployment handover state machine** with emergency contingency handling.
 

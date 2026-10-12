@@ -62,7 +62,7 @@ router.post('/register', async (req, res) => {
   const usernameRegex = /^[a-zA-Z0-9_-]{3,20}$/;
   if (!usernameRegex.test(trimmedUsername)) {
     return res.status(400).json({
-      error: 'Operator ID must be 3–20 characters and contain only letters, numbers, hyphens, and underscores'
+      error: 'Operator ID must be 3-20 characters and contain only letters, numbers, hyphens, and underscores'
     });
   }
 
