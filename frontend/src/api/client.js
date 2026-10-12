@@ -319,5 +319,13 @@ export const api = {
       const q = params.toString() ? `?${params.toString()}` : '';
       return await request(`/deployment/events${q}`);
     }, []);
+  },
+
+  register: async (username, password) => {
+    const data = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+    return data;
   }
 };

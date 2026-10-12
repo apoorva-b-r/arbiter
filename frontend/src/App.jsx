@@ -15,6 +15,7 @@ import {
 import { NavBar } from './components/layout/NavBar';
 
 import { Login } from './pages/Login';
+import { Signup } from './pages/Signup';
 import { Dashboard } from './pages/Dashboard';
 import { PassHistory } from './pages/PassHistory';
 import { Validation } from './pages/Validation';
@@ -77,6 +78,19 @@ export function App() {
             element={
               <PublicRoute>
                 <Login />
+              </PublicRoute>
+            }
+          />
+
+          {/* -------------------------------------------------
+              SIGNUP
+              Only visible when the user is NOT logged in
+          ------------------------------------------------- */}
+          <Route
+            path="/signup"
+            element={
+              <PublicRoute>
+                <Signup />
               </PublicRoute>
             }
           />
