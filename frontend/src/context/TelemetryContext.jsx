@@ -132,7 +132,7 @@ export const TelemetryProvider = ({ children }) => {
   }, [settings]);
 
   // Dedicated Satellite Deployment State Machine Hook
-  const deploymentStateHook = useDeploymentState();
+  const deploymentStateHook = useDeploymentState({ activePassId: telemetry?.currentPassId });
   const {
     deployment,
     inspectState,
