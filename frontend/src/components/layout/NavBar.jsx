@@ -5,6 +5,7 @@ import {
   Satellite, 
   Activity, 
   History, 
+  Inbox,
   ShieldCheck, 
   Rocket, 
   Sliders, 
@@ -55,6 +56,10 @@ export const NavBar = () => {
         <NavLink to="/history" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <History size={16} />
           <span>Pass History</span>
+        </NavLink>
+        <NavLink to="/received" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Inbox size={16} />
+          <span>Received Data</span>
         </NavLink>
         <NavLink to="/validation" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <ShieldCheck size={16} />

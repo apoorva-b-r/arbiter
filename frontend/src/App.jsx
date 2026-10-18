@@ -18,6 +18,7 @@ import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Dashboard } from './pages/Dashboard';
 import { PassHistory } from './pages/PassHistory';
+import { ReceivedData } from './pages/ReceivedData';
 import { Validation } from './pages/Validation';
 import { Deployment } from './pages/Deployment';
 import { Settings } from './pages/Settings';
@@ -126,6 +127,19 @@ export function App() {
             element={
               <ProtectedLayout>
                 <PassHistory />
+              </ProtectedLayout>
+            }
+          />
+
+
+          {/* -------------------------------------------------
+              RECEIVED DATA
+          ------------------------------------------------- */}
+          <Route
+            path="/received"
+            element={
+              <ProtectedLayout>
+                <ReceivedData />
               </ProtectedLayout>
             }
           />

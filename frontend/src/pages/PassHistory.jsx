@@ -2,7 +2,25 @@ import React, { useState } from 'react';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useTelemetry } from '../context/TelemetryContext';
 import { api } from '../api/client';
-import { History, Eye, X, CheckCircle2, UserCheck, Calendar, Clock, Loader2, Edit3, Save, Plus, AlertTriangle } from 'lucide-react';
+import { DownlinkDetailModal } from '../components/downlink/DownlinkDetailModal';
+import {
+  History,
+  Eye,
+  X,
+  CheckCircle2,
+  UserCheck,
+  Calendar,
+  Clock,
+  Loader2,
+  Edit3,
+  Save,
+  Plus,
+  AlertTriangle,
+  Inbox,
+  Image as ImageIcon,
+  Volume2,
+  Cpu
+} from 'lucide-react';
 
 const formatPassTime = (createdAt, timeStr, dateStr) => {
   if (createdAt) {
@@ -29,6 +47,11 @@ export const PassHistory = () => {
   const [selectedPass, setSelectedPass] = useState(null);
   const [modalDecisions, setModalDecisions] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
+
+  const [passDownlinks, setPassDownlinks] = useState([]);
+  const [passDownlinkStats, setPassDownlinkStats] = useState({ total: 0, received: 0, partial: 0, lost: 0, successRate: 0 });
+  const [loadingDownlinks, setLoadingDownlinks] = useState(false);
+  const [selectedDownlinkDetail, setSelectedDownlinkDetail] = useState(null);
 
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState('');
@@ -84,6 +107,21 @@ export const PassHistory = () => {
     setEditingNotes(false);
     setNotesText(pass.operatorNotes || '');
     setNotesError('');
+
+    setPassDownlinks([]);
+    setPassDownlinkStats({ total: 0, received: 0, partial: 0, lost: 0, successRate: 0 });
+    setLoadingDownlinks(true);
+
+    api.getDownlinks({ passId: pass.passId })
+      .then(dwns => setPassDownlinks(Array.isArray(dwns) ? dwns : []))
+      .catch(err => console.warn('Failed to load pass downlinks:', err))
+      .finally(() => setLoadingDownlinks(false));
+
+    api.getDownlinkStats(pass.passId)
+      .then(st => {
+        if (st) setPassDownlinkStats(st);
+      })
+      .catch(err => console.warn('Failed to load pass downlink stats:', err));
 
     try {
       const detail = await api.getPassDetail(pass.passId);
@@ -283,6 +321,93 @@ export const PassHistory = () => {
                 </div>
               </div>
 
+              {/* Received Data Section */}
+              <div className="received-data-box">
+                <div className="received-data-header">
+                  <span className="modal-section-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Inbox size={15} style={{ color: 'var(--color-berry-rose)' }} />
+                    Received Data ({passDownlinks.length} Downlinks)
+                  </span>
+                  <div className="pass-downlink-pills mono text-xs">
+                    <span className="stat-pill success">
+                      {passDownlinkStats.received || passDownlinks.filter(d => d.status === 'RECEIVED').length} Recv ({passDownlinkStats.successRate || (passDownlinks.length > 0 ? Math.round((passDownlinks.filter(d => d.status === 'RECEIVED').length / passDownlinks.length) * 100) : 0)}%)
+                    </span>
+                    <span className="stat-pill warning">
+                      {passDownlinkStats.partial || passDownlinks.filter(d => d.status === 'PARTIAL').length} Partial
+                    </span>
+                    <span className="stat-pill critical">
+                      {passDownlinkStats.lost || passDownlinks.filter(d => d.status === 'LOST').length} Lost
+                    </span>
+                  </div>
+                </div>
+
+                {loadingDownlinks ? (
+                  <div className="strip-loading mono text-xs">
+                    <Loader2 size={13} className="animate-spin" /> Fetching pass received payload records...
+                  </div>
+                ) : passDownlinks.length > 0 ? (
+                  <div className="downlink-thumbnail-strip">
+                    {passDownlinks.map((dl) => {
+                      const isLost = dl.status === 'LOST';
+                      const isPartial = dl.status === 'PARTIAL';
+                      return (
+                        <div
+                          key={dl.downlinkId || dl.id}
+                          onClick={() => setSelectedDownlinkDetail(dl)}
+                          className={`strip-card ${isLost ? 'strip-lost' : isPartial ? 'strip-partial' : ''}`}
+                          title={`Click to inspect ${dl.type} payload (${dl.status})`}
+                          tabIndex={0}
+                          role="button"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') setSelectedDownlinkDetail(dl);
+                          }}
+                        >
+                          <div className="strip-thumb-viewport">
+                            {isLost ? (
+                              <div className="strip-placeholder lost">
+                                <AlertTriangle size={15} />
+                              </div>
+                            ) : dl.type === 'SSTV' ? (
+                              <div className="strip-sstv-box">
+                                <img
+                                  src={`/downlink/sstv/${dl.payload?.imageKey || 'sstv-01'}.jpg`}
+                                  alt="SSTV"
+                                  className="strip-img"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                  }}
+                                />
+                                <div className="strip-placeholder sstv" style={{ display: 'none' }}>
+                                  <ImageIcon size={15} />
+                                </div>
+                              </div>
+                            ) : dl.type === 'Codec2' || dl.type === 'M17' ? (
+                              <div className="strip-placeholder voice">
+                                <Volume2 size={15} />
+                              </div>
+                            ) : (
+                              <div className="strip-placeholder ttc">
+                                <Cpu size={15} />
+                              </div>
+                            )}
+                            <span className={`strip-dot dot-${(dl.status || 'received').toLowerCase()}`} />
+                          </div>
+                          <div className="strip-meta">
+                            <span className="strip-type mono">{dl.type}</span>
+                            <span className="strip-time mono">{formatPassTime(dl.createdAt, dl.timestamp)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="strip-empty mono text-xs">
+                    No received data recorded for this pass.
+                  </div>
+                )}
+              </div>
+
               {/* Operator Notes Section */}
               <div className="operator-notes-box">
                 <div className="notes-header">
@@ -480,7 +605,201 @@ export const PassHistory = () => {
         </div>
       )}
 
+      {/* Downlink Detail Modal from Thumbnail Strip */}
+      {selectedDownlinkDetail && (
+        <DownlinkDetailModal
+          downlink={selectedDownlinkDetail}
+          onClose={() => setSelectedDownlinkDetail(null)}
+        />
+      )}
+
       <style>{`
+        /* Received Data Section inside Pass History Modal */
+        .received-data-box {
+          background-color: #FFF9FA;
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 0.85rem 1rem;
+          margin-bottom: 1.25rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.65rem;
+        }
+
+        .received-data-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .pass-downlink-pills {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+        }
+
+        .stat-pill {
+          padding: 0.15rem 0.45rem;
+          border-radius: 4px;
+          font-size: 0.68rem;
+          font-weight: 600;
+          border: 1px solid var(--border-color);
+          background-color: #FFFFFF;
+          color: var(--text-primary);
+        }
+
+        .stat-pill.success {
+          background-color: var(--alert-success-bg);
+          color: var(--alert-success-text);
+          border-color: var(--alert-success-border);
+        }
+
+        .stat-pill.warning {
+          background-color: var(--alert-warning-bg);
+          color: var(--alert-warning-text);
+          border-color: var(--alert-warning-border);
+        }
+
+        .stat-pill.critical {
+          background-color: var(--alert-critical-bg);
+          color: var(--alert-critical-text);
+          border-color: var(--alert-critical-border);
+        }
+
+        .downlink-thumbnail-strip {
+          display: flex;
+          gap: 0.65rem;
+          overflow-x: auto;
+          padding-bottom: 0.35rem;
+        }
+
+        .strip-card {
+          min-width: 96px;
+          width: 96px;
+          background: #FFFFFF;
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          padding: 0.45rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+          cursor: pointer;
+          transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .strip-card:hover {
+          transform: translateY(-2px);
+          border-color: var(--color-berry-rose);
+          box-shadow: 0 4px 10px rgba(96, 36, 55, 0.1);
+        }
+
+        .strip-card.strip-lost {
+          background-color: #FFF5F6;
+          border-color: var(--alert-critical-border);
+        }
+
+        .strip-thumb-viewport {
+          position: relative;
+          width: 100%;
+          height: 52px;
+          background: #18080E;
+          border-radius: 6px;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .strip-sstv-box {
+          width: 100%;
+          height: 100%;
+        }
+
+        .strip-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .strip-placeholder {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .strip-placeholder.sstv {
+          background: linear-gradient(135deg, #2B0F18, #602437);
+          color: var(--color-soft-blush);
+        }
+
+        .strip-placeholder.voice {
+          background: #FFF0F3;
+          color: var(--color-berry-rose);
+        }
+
+        .strip-placeholder.ttc {
+          background: #FFF5F7;
+          color: var(--color-raspberry);
+        }
+
+        .strip-placeholder.lost {
+          background: #FFF0F2;
+          color: var(--alert-critical-border);
+        }
+
+        .strip-dot {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+        }
+
+        .dot-received {
+          background-color: var(--alert-success-border);
+          box-shadow: 0 0 4px var(--alert-success-border);
+        }
+
+        .dot-partial {
+          background-color: var(--alert-warning-border);
+        }
+
+        .dot-lost {
+          background-color: var(--alert-critical-border);
+        }
+
+        .strip-meta {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .strip-type {
+          font-size: 0.68rem;
+          font-weight: 700;
+          color: var(--color-berry-rose);
+        }
+
+        .strip-time {
+          font-size: 0.62rem;
+          color: var(--text-muted);
+        }
+
+        .strip-loading, .strip-empty {
+          padding: 0.8rem;
+          text-align: center;
+          color: var(--text-muted);
+          background: #FFFFFF;
+          border-radius: 8px;
+          border: 1px dashed var(--border-color);
+        }
+
         .bold { font-weight: 700; color: var(--color-berry-rose); }
         .cell-with-sub { display: flex; flex-direction: column; }
 

@@ -355,6 +355,40 @@ export const api = {
     }, []);
   },
 
+  // Downlink API
+  getDownlinks: async (params = {}) => {
+    return withFallback(async () => {
+      const query = new URLSearchParams();
+      if (params.type) query.append('type', params.type);
+      if (params.status) query.append('status', params.status);
+      if (params.passId) query.append('passId', params.passId);
+      if (params.limit) query.append('limit', params.limit);
+      const q = query.toString() ? `?${query.toString()}` : '';
+      const data = await request(`/downlinks${q}`);
+      return Array.isArray(data) ? data : [];
+    }, []);
+  },
+
+  getDownlinkStats: async (passId) => {
+    return withFallback(async () => {
+      const q = passId ? `?passId=${encodeURIComponent(passId)}` : '';
+      const data = await request(`/downlinks/stats${q}`);
+      return data || { total: 0, received: 0, partial: 0, lost: 0, successRate: 0, retransmits: 0 };
+    }, { total: 0, received: 0, partial: 0, lost: 0, successRate: 0, retransmits: 0 });
+  },
+
+  getDownlink: async (id) => {
+    return withFallback(async () => {
+      return await request(`/downlinks/${encodeURIComponent(id)}`);
+    }, null);
+  },
+
+  getDownlinkByDecision: async (decisionId) => {
+    return withFallback(async () => {
+      return await request(`/downlinks/by-decision/${encodeURIComponent(decisionId)}`);
+    }, null);
+  },
+
   register: async (username, password) => {
     const data = await request('/auth/register', {
       method: 'POST',
