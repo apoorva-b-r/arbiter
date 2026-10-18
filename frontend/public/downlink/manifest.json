@@ -1,0 +1,60 @@
+{
+  "sstv": [
+    {
+      "key": "sstv-01",
+      "file": "/downlink/sstv/sstv-01.jpg",
+      "caption": "Rocket launch at night"
+    },
+    {
+      "key": "sstv-02",
+      "file": "/downlink/sstv/sstv-02.jpg",
+      "caption": "Spacecraft above Earth"
+    },
+    {
+      "key": "sstv-03",
+      "file": "/downlink/sstv/sstv-03.jpg",
+      "caption": "Rocket ascending from the launch pad"
+    },
+    {
+      "key": "sstv-04",
+      "file": "/downlink/sstv/sstv-04.jpg",
+      "caption": "Launch plume against the evening sky"
+    },
+    {
+      "key": "sstv-05",
+      "file": "/downlink/sstv/sstv-05.jpg",
+      "caption": "Technicians working on satellite hardware"
+    },
+    {
+      "key": "sstv-06",
+      "file": "/downlink/sstv/sstv-06.jpg",
+      "caption": "Spacecraft with Earth in the background"
+    }
+  ],
+  "voice": [
+    {
+      "key": "voice-01",
+      "file": "/downlink/voice/voice-01.mp3",
+      "type": "Codec2",
+      "transcript": "SomaiyaSat, telemetry nominal. All systems green."
+    },
+    {
+      "key": "voice-02",
+      "file": "/downlink/voice/voice-02.mp3",
+      "type": "M17",
+      "transcript": "This is SomaiyaSat, greetings from low Earth orbit."
+    },
+    {
+      "key": "voice-03",
+      "file": "/downlink/voice/voice-03.mp3",
+      "type": "Codec2",
+      "transcript": "Ground station Mumbai, downlink window open."
+    },
+    {
+      "key": "voice-04",
+      "file": "/downlink/voice/voice-04.mp3",
+      "type": "M17",
+      "transcript": "SomaiyaSat signing off. See you next pass."
+    }
+  ]
+}
