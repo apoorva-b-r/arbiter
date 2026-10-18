@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
@@ -6,10 +7,123 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const Pass = require('../src/models/Pass');
 const Decision = require('../src/models/Decision');
+const Downlink = require('../src/models/Downlink');
+
+if (!Decision.schema.path('downlinkId')) {
+  Decision.schema.add({ downlinkId: { type: String } });
+}
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/arbiter';
 
 const TYPES = ['TTC', 'SSTV', 'Codec2', 'M17'];
+
+// Load downlink manifest if available
+const manifestPath = path.resolve(__dirname, '../../frontend/public/downlink/manifest.json');
+let manifestData = null;
+try {
+  if (fs.existsSync(manifestPath)) {
+    manifestData = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  }
+} catch (err) {
+  // Ignore fallback to defaults
+}
+
+const FALLBACK_SSTV = [
+  { key: 'sstv-01', caption: 'Earth limb over the Indian Ocean' },
+  { key: 'sstv-02', caption: 'Cyclone formation over the Bay of Bengal' },
+  { key: 'sstv-03', caption: 'Himalayan range optical pass from orbit' },
+  { key: 'sstv-04', caption: 'Western Ghats coastal cloud cover' }
+];
+
+const FALLBACK_VOICE = [
+  { key: 'voice-01', transcript: 'SomaiyaSat, telemetry nominal.', type: 'Codec2' },
+  { key: 'voice-02', transcript: 'SomaiyaSat beacon acknowledging ground station ping.', type: 'M17' },
+  { key: 'voice-03', transcript: 'SomaiyaSat orbit tracking established on 437 MHz.', type: 'Codec2' }
+];
+
+function getSstvAsset() {
+  const list = (manifestData && Array.isArray(manifestData.sstv) && manifestData.sstv.length > 0)
+    ? manifestData.sstv
+    : FALLBACK_SSTV;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function getVoiceAsset(type) {
+  const fullList = (manifestData && Array.isArray(manifestData.voice) && manifestData.voice.length > 0)
+    ? manifestData.voice
+    : FALLBACK_VOICE;
+  const filtered = fullList.filter(item => !item.type || item.type === type);
+  const list = filtered.length > 0 ? filtered : fullList;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function calculateDownlinkStatus(linkQuality, type) {
+  let status;
+  if (linkQuality >= 60) {
+    status = 'RECEIVED';
+  } else if (linkQuality >= 30) {
+    status = Math.random() < 0.7 ? 'RECEIVED' : 'PARTIAL';
+  } else {
+    const rand = Math.random();
+    if (rand < 0.5) {
+      status = 'LOST';
+    } else if (rand < 0.8) {
+      status = 'PARTIAL';
+    } else {
+      status = 'RECEIVED';
+    }
+  }
+
+  // TT&C is small and robust: if type is TTC, LOST becomes PARTIAL
+  if (type === 'TTC' && status === 'LOST') {
+    status = 'PARTIAL';
+  }
+
+  return status;
+}
+
+function buildDownlinkPayload(type, linkQuality, batteryPercent, mode) {
+  if (type === 'TTC') {
+    const batteryVoltage = Math.round((3.3 + (batteryPercent / 100) * (4.2 - 3.3)) * 100) / 100;
+    const boardTempC = Math.round((5 + Math.random() * (45 - 5)) * 10) / 10;
+    const solarCurrentmA = Math.floor(Math.random() * 351);
+    const uptimeSec = Math.floor(86400 + Math.random() * 500000);
+    const rssiDbm = Math.round(-120 + (linkQuality / 100) * 50);
+
+    return {
+      batteryVoltage,
+      batteryPercent,
+      boardTempC,
+      solarCurrentmA,
+      uptimeSec,
+      mode: mode || 'TTC',
+      rssiDbm
+    };
+  }
+
+  if (type === 'SSTV') {
+    const asset = getSstvAsset();
+    return {
+      imageKey: asset.key,
+      caption: asset.caption,
+      quality: linkQuality,
+      mode: 'Martin M1',
+      resolution: '320x256'
+    };
+  }
+
+  if (type === 'Codec2' || type === 'M17') {
+    const asset = getVoiceAsset(type);
+    return {
+      audioKey: asset.key,
+      transcript: asset.transcript,
+      bitrate: type === 'Codec2' ? '3200 bps' : '3200 bps digital voice',
+      durationSec: Math.floor(4 + Math.random() * 8)
+    };
+  }
+
+  return {};
+}
 
 const DECISION_REASONS = {
   TTC: [
@@ -56,9 +170,10 @@ async function seed() {
   await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 8000 });
   console.log(`[SEED] Connected to ${mongoose.connection.host}`);
 
-  console.log('[SEED] Clearing existing Pass and Decision documents...');
+  console.log('[SEED] Clearing existing Pass, Decision, and Downlink documents...');
   await Pass.deleteMany({});
   await Decision.deleteMany({});
+  await Downlink.deleteMany({});
 
   console.log('[SEED] Generating 15 ground passes over the last 30 days...');
 
@@ -102,6 +217,7 @@ async function seed() {
 
   const passesToInsert = [];
   const decisionsToInsert = [];
+  const downlinksToInsert = [];
 
   for (let i = 0; i < passSpecs.length; i++) {
     const { startObj, durationSec } = passSpecs[i];
@@ -119,6 +235,7 @@ async function seed() {
 
     for (let d = numDecisions; d >= 1; d--) {
       const decId = `DEC-${1000 + (i + 1) * 20 + d}`;
+      const dwnId = `DWN-${1000 + (i + 1) * 20 + d}`;
       const isOverride = Math.random() < 0.15;
       const isStarvationSafeguard = !isOverride && Math.random() < 0.125;
 
@@ -141,12 +258,55 @@ async function seed() {
         reasoning = reasonList[Math.floor(Math.random() * reasonList.length)];
       }
 
-      const decMs = startObj.getTime() + Math.floor((d / (numDecisions + 1)) * durationSec * 1000);
+      const progress = (numDecisions > 1) ? (numDecisions - d) / (numDecisions - 1) : 0.5;
+      const decMs = startObj.getTime() + Math.floor(progress * durationSec * 1000);
       const decDate = new Date(decMs);
       const decInfo = getLocalPassInfo(decDate);
 
+      // Link quality at decision time: pass elevation curve with jitter
+      const curve = Math.pow(Math.sin(progress * Math.PI), 1.4);
+      const baseLink = 17;
+      const noise = Math.floor(Math.random() * 11) - 5;
+      const decisionLinkQuality = Math.max(5, Math.min(100, Math.round(baseLink + (peakLinkQuality - baseLink) * curve + noise)));
+      const decisionBattery = Math.round((avgBattery + (Math.random() * 4 - 2)) * 10) / 10;
+
+      const status = calculateDownlinkStatus(decisionLinkQuality, selectedType);
+      const ackReceived = status !== 'LOST';
+      const ackLatencyMs = ackReceived ? Math.floor(120 + Math.random() * (900 - 120 + 1)) : null;
+      const payload = buildDownlinkPayload(selectedType, decisionLinkQuality, decisionBattery, selectedType);
+
+      const typeLabels = {
+        TTC: 'Periodic Housekeeping Beacon',
+        SSTV: 'High-Res Earth Observation Frame',
+        Codec2: 'Compressed Digital Voice Stream',
+        M17: 'Telemetry Packet Batch'
+      };
+      const typeSizes = {
+        TTC: 14,
+        SSTV: 450,
+        Codec2: 32,
+        M17: 110
+      };
+
+      downlinksToInsert.push({
+        downlinkId: dwnId,
+        decisionId: decId,
+        passId: startInfo.passId,
+        type: selectedType,
+        label: typeLabels[selectedType] || `${selectedType} Transmission`,
+        sizeKb: typeSizes[selectedType] || 25,
+        status,
+        linkQualityAtSend: decisionLinkQuality,
+        ackReceived,
+        ackLatencyMs,
+        payload,
+        isRetransmit: false,
+        createdAt: decDate
+      });
+
       decisionsToInsert.push({
         decisionId: decId,
+        downlinkId: dwnId,
         timestamp: decInfo.timeStr,
         selectedType,
         reasoning,
@@ -175,8 +335,9 @@ async function seed() {
 
   await Pass.insertMany(passesToInsert);
   await Decision.insertMany(decisionsToInsert);
+  await Downlink.insertMany(downlinksToInsert);
 
-  console.log(`[SEED SUCCESS] Successfully inserted ${passesToInsert.length} passes and ${decisionsToInsert.length} decisions!`);
+  console.log(`[SEED SUCCESS] Successfully inserted ${passesToInsert.length} passes, ${decisionsToInsert.length} decisions, and ${downlinksToInsert.length} downlinks!`);
   await mongoose.disconnect();
   process.exit(0);
 }
