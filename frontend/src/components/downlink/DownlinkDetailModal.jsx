@@ -18,6 +18,8 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { TtcHealthCard } from './TtcHealthCard';
+import SstvImage from './SstvImage';
+import VoicePlayer from './VoicePlayer';
 
 export const DownlinkDetailModal = ({ downlink, onClose }) => {
   const [imageError, setImageError] = useState(false);
@@ -34,8 +36,8 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
   // Close on Escape key press
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && onClose) {
-        onClose();
+      if (e.key === 'Escape') {
+        onClose?.();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -270,34 +272,13 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
             ) : type === 'SSTV' ? (
               /* SSTV Payload */
               <div className="sstv-display-card">
-                {/* TODO: Swap in <SstvImage /> from '../downlink/SstvImage' when available */}
-                <div className="sstv-viewport-wrapper">
-                  {!imageError ? (
-                    <div className="sstv-img-container">
-                      <img
-                        src={`/downlink/sstv/${payload.imageKey || 'sstv-01'}.jpg`}
-                        alt={payload.caption || 'SSTV Frame'}
-                        className="sstv-image"
-                        onError={() => setImageError(true)}
-                      />
-                      <div className="scanline-overlay" />
-                      <div className="sstv-hud">
-                        <span className="hud-badge mono">SSTV {payload.mode || 'Martin M1'}</span>
-                        <span className="hud-badge mono">{payload.resolution || '320x256'}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="sstv-placeholder">
-                      <div className="placeholder-watermark">
-                        <ImageIcon size={48} />
-                        <span className="placeholder-title">IMAGE FRAME DEMODULATED</span>
-                        <span className="placeholder-sub mono">
-                          Key: {payload.imageKey || 'sstv-frame'} • Mode: {payload.mode || 'Martin M1'}
-                        </span>
-                      </div>
-                      <div className="scanline-overlay" />
-                    </div>
-                  )}
+                <div className="sstv-viewport-wrapper" style={{ display: 'flex', justifyContent: 'center' }}>
+                  <SstvImage
+                    src={`/downlink/sstv/${payload.imageKey}.jpg`}
+                    quality={payload.quality}
+                    status={downlink.status}
+                    caption={payload.caption}
+                  />
                 </div>
 
                 <div className="sstv-meta-card">
@@ -335,31 +316,13 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
             ) : type === 'Codec2' || type === 'M17' ? (
               /* Voice Payload */
               <div className="voice-display-card">
-                {/* TODO: Swap in <VoicePlayer /> from '../downlink/VoicePlayer' when available */}
-                <div className="voice-audio-box">
-                  <div className="audio-header">
-                    <div className="audio-icon-pulse">
-                      <Volume2 size={24} style={{ color: 'var(--color-berry-rose)' }} />
-                    </div>
-                    <div>
-                      <h5 className="audio-title">
-                        {type === 'Codec2' ? 'Codec2 Digital Speech Audio' : 'M17 Protocol Voice Stream'}
-                      </h5>
-                      <span className="audio-subtitle mono">
-                        Asset: {payload.audioKey || 'voice-sample'}.mp3
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="audio-player-wrapper">
-                    <audio
-                      controls
-                      src={`/downlink/voice/${payload.audioKey || 'voice-01'}.mp3`}
-                      className="native-audio-player"
-                    >
-                      Your browser does not support the audio element.
-                    </audio>
-                  </div>
+                <div className="voice-audio-box" style={{ display: 'flex', justifyContent: 'center' }}>
+                  <VoicePlayer
+                    src={`/downlink/voice/${payload.audioKey}.mp3`}
+                    transcript={payload.transcript}
+                    type={downlink.type}
+                    status={downlink.status}
+                  />
                 </div>
 
                 <div className="voice-transcript-card">
@@ -430,7 +393,8 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
             to { opacity: 1; }
           }
 
-          .modal-backdrop .downlink-modal {
+          .modal-backdrop .downlink-modal,
+          .downlink-modal {
             max-width: 1080px;
             width: 94vw;
             max-height: 88vh;
@@ -443,6 +407,8 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
             border-radius: 16px;
             box-shadow: 0 20px 50px rgba(43, 15, 24, 0.45);
             margin: auto;
+            position: relative;
+            z-index: 100000;
             animation: modalDialogSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           }
 
@@ -981,10 +947,9 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
     </div>
   );
 
-  if (typeof document !== 'undefined') {
-    return createPortal(modalElement, document.body);
-  }
-  return modalElement;
+  return typeof document !== 'undefined'
+    ? createPortal(modalElement, document.body)
+    : modalElement;
 };
 
 export default DownlinkDetailModal;

@@ -92,6 +92,8 @@ export async function withFallback(apiCall, mockValue) {
 const mapDecision = (d) => ({
   ...d,
   id: d.id || d.decisionId || d._id,
+  decisionId: d.decisionId || d.id || d._id,
+  downlinkId: d.downlinkId || d.downlink_id || null,
   createdAt: d.createdAt || null,
   isOverridden: Boolean(d.isOverridden)
 });
@@ -150,7 +152,12 @@ export const api = {
     return withFallback(async () => {
       const data = await request('/passes');
       return Array.isArray(data) ? data.map(mapPass) : [];
-    }, MOCK_PASS_HISTORY);
+    }, (err) => {
+      if (err && (err.status === 401 || err.status === 403)) {
+        throw err;
+      }
+      return MOCK_PASS_HISTORY;
+    });
   },
 
   getPassDetail: async (passId) => {
@@ -386,7 +393,12 @@ export const api = {
   getDownlinkByDecision: async (decisionId) => {
     return withFallback(async () => {
       return await request(`/downlinks/by-decision/${encodeURIComponent(decisionId)}`);
-    }, null);
+    }, (err) => {
+      if (err && err.status === 404) {
+        throw err;
+      }
+      return null;
+    });
   },
 
   register: async (username, password) => {
