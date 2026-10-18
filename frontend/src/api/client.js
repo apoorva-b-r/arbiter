@@ -45,12 +45,17 @@ export async function request(path, options = {}) {
       const error = new Error(errorData.error || errorData.message || `HTTP error! status: ${res.status}`);
       error.status = res.status;
 
-      if (res.status === 401 && !path.startsWith('/auth')) {
+      const isAuthRoute = path.startsWith('/auth') || path.startsWith('auth');
+      if (res.status === 401 && !isAuthRoute) {
         try {
           sessionStorage.removeItem('arbiter_user');
           localStorage.removeItem('arbiter_user');
         } catch (_) {}
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        if (
+          typeof window !== 'undefined' &&
+          window.location.pathname !== '/login' &&
+          window.location.pathname !== '/signup'
+        ) {
           window.location.href = '/login';
         }
       }
