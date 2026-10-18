@@ -315,8 +315,12 @@ function recordDispatchedDownlink({ item, type, decisionId, passId, now }) {
     downlinkLog.pop();
   }
 
+  let savePromise = null;
   if (isDbConnected()) {
-    Downlink.create(newDownlink).catch(err => console.error('[DB ERROR] Failed to save downlink:', err.message));
+    savePromise = Downlink.create(newDownlink).catch(err => {
+      console.error('[DB ERROR] Failed to save downlink:', err.message);
+      return null;
+    });
   }
 
   if (status === 'LOST') {
@@ -338,7 +342,7 @@ function recordDispatchedDownlink({ item, type, decisionId, passId, now }) {
     queueItems.push(retransmitItem);
   }
 
-  return downlinkId;
+  return { downlinkId, savePromise };
 }
 let intervalId = null;
 let tickCounter = 0;
@@ -600,7 +604,7 @@ async function startSimulator() {
     }
 
     const decId = `DEC-${now.getTime().toString().slice(-4)}`;
-    const downlinkId = recordDispatchedDownlink({
+    const { downlinkId, savePromise: downlinkSavePromise } = recordDispatchedDownlink({
       item: dispatchedItem,
       type: decision.selectedType,
       decisionId: decId,
@@ -640,19 +644,27 @@ async function startSimulator() {
       }
     }
 
-    // Fire-and-forget save auto decision to MongoDB if connected
+    // Save auto decision to MongoDB only AFTER downlink is saved to prevent 404 race on by-decision lookups
     if (isDbConnected()) {
-      Decision.create({
-        decisionId: newDec.decisionId,
-        downlinkId: newDec.downlinkId,
-        timestamp: newDec.timestamp,
-        createdAt: newDec.createdAt,
-        selectedType: newDec.selectedType,
-        reasoning: newDec.reasoning,
-        isOverridden: false,
-        passId: newDec.passId,
-        score: newDec.score
-      }).catch(err => console.error('[DB ERROR] Failed to save auto decision:', err.message));
+      const saveDecision = () => {
+        Decision.create({
+          decisionId: newDec.decisionId,
+          downlinkId: newDec.downlinkId,
+          timestamp: newDec.timestamp,
+          createdAt: newDec.createdAt,
+          selectedType: newDec.selectedType,
+          reasoning: newDec.reasoning,
+          isOverridden: false,
+          passId: newDec.passId,
+          score: newDec.score
+        }).catch(err => console.error('[DB ERROR] Failed to save auto decision:', err.message));
+      };
+
+      if (downlinkSavePromise) {
+        downlinkSavePromise.finally(saveDecision);
+      } else {
+        saveDecision();
+      }
     }
 
   }, 3000);
@@ -685,7 +697,7 @@ function applyOverride(mode) {
   const timeStr = getLocalPassInfo(now).timeStr;
   const decId = `DEC-${now.getTime().toString().slice(-4)}`;
 
-  const downlinkId = recordDispatchedDownlink({
+  const { downlinkId, savePromise: downlinkSavePromise } = recordDispatchedDownlink({
     item: dispatchedItem,
     type: mode,
     decisionId: decId,
@@ -726,20 +738,28 @@ function applyOverride(mode) {
     }
   }
 
-  // Fire-and-forget save override decision to MongoDB if connected
+  // Save override decision to MongoDB only AFTER downlink is saved to prevent 404 race on by-decision lookups
   if (isDbConnected()) {
-    Decision.create({
-      decisionId: newDec.decisionId,
-      downlinkId: newDec.downlinkId,
-      timestamp: newDec.timestamp,
-      createdAt: newDec.createdAt,
-      selectedType: newDec.selectedType,
-      reasoning: newDec.reasoning,
-      isOverridden: true,
-      overriddenType: mode,
-      passId: newDec.passId,
-      score: 0
-    }).catch(err => console.error('[DB ERROR] Failed to save override decision:', err.message));
+    const saveOverrideDecision = () => {
+      Decision.create({
+        decisionId: newDec.decisionId,
+        downlinkId: newDec.downlinkId,
+        timestamp: newDec.timestamp,
+        createdAt: newDec.createdAt,
+        selectedType: newDec.selectedType,
+        reasoning: newDec.reasoning,
+        isOverridden: true,
+        overriddenType: mode,
+        passId: newDec.passId,
+        score: 0
+      }).catch(err => console.error('[DB ERROR] Failed to save override decision:', err.message));
+    };
+
+    if (downlinkSavePromise) {
+      downlinkSavePromise.finally(saveOverrideDecision);
+    } else {
+      saveOverrideDecision();
+    }
   }
 
   return newDec;

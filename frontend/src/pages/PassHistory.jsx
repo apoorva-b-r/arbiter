@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useTelemetry } from '../context/TelemetryContext';
 import { api } from '../api/client';
@@ -43,10 +43,27 @@ const formatPassTime = (createdAt, timeStr, dateStr) => {
 };
 
 export const PassHistory = () => {
-  const { passes, backendOnline, createNewPass } = useTelemetry();
+  const { passes, backendOnline, createNewPass, setPasses, refetchPasses } = useTelemetry();
   const [selectedPass, setSelectedPass] = useState(null);
   const [modalDecisions, setModalDecisions] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
+
+  // Refetch passes when the Pass History page opens
+  useEffect(() => {
+    let isMounted = true;
+    if (refetchPasses) {
+      refetchPasses();
+    } else {
+      api.getPasses().then((data) => {
+        if (isMounted && Array.isArray(data) && setPasses) {
+          setPasses(data);
+        }
+      }).catch((err) => {
+        console.warn('[PassHistory] Failed to refetch passes:', err);
+      });
+    }
+    return () => { isMounted = false; };
+  }, [refetchPasses, setPasses]);
 
   const [passDownlinks, setPassDownlinks] = useState([]);
   const [passDownlinkStats, setPassDownlinkStats] = useState({ total: 0, received: 0, partial: 0, lost: 0, successRate: 0 });

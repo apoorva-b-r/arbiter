@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   CheckCircle2,
@@ -20,6 +21,16 @@ import { TtcHealthCard } from './TtcHealthCard';
 
 export const DownlinkDetailModal = ({ downlink, onClose }) => {
   const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   if (!downlink) return null;
 
@@ -57,7 +68,7 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
   const isPartial = status === 'PARTIAL';
   const isReceived = status === 'RECEIVED';
 
-  return (
+  const modalElement = (
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-content card downlink-modal"
@@ -377,6 +388,24 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
         </div>
 
         <style>{`
+          .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(43, 15, 24, 0.78);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            padding: 1.5rem;
+            box-sizing: border-box;
+          }
+
           .downlink-modal {
             max-width: 780px;
             width: 95vw;
@@ -388,6 +417,8 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
             background: #FFFFFF;
             border: 1px solid var(--border-color);
             box-shadow: 0 16px 40px rgba(96, 36, 55, 0.35);
+            position: relative;
+            z-index: 100000;
           }
 
           .downlink-modal-header {
@@ -892,6 +923,10 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalElement, document.body)
+    : modalElement;
 };
 
 export default DownlinkDetailModal;

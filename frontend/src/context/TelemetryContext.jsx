@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api, request } from '../api/client';
 import { useDeploymentState } from '../hooks/useDeploymentState';
 import {
@@ -71,16 +71,23 @@ export const sortNewestFirst = (decisionsList) => {
   return [...list].sort((a, b) => getDecisionDate(b) - getDecisionDate(a));
 };
 
-// De-duplicate by decision ID and sort newest first
+// De-duplicate by decision ID, keeping downlinkId, and sort newest first
 export const processDecisions = (decisionsList) => {
   const sorted = sortNewestFirst(decisionsList);
-  const seen = new Set();
-  return sorted.filter(item => {
+  const seen = new Map();
+  for (const item of sorted) {
     const id = item.id || item.decisionId || item._id;
-    if (!id || seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
+    if (!id) continue;
+    if (!seen.has(id)) {
+      seen.set(id, item);
+    } else {
+      const existing = seen.get(id);
+      if (!existing.downlinkId && item.downlinkId) {
+        seen.set(id, { ...existing, downlinkId: item.downlinkId });
+      }
+    }
+  }
+  return Array.from(seen.values());
 };
 
 function isTokenExpired(token) {
@@ -114,7 +121,7 @@ export const TelemetryProvider = ({ children }) => {
     // Clean up any legacy localStorage session on app start
     try {
       localStorage.removeItem('arbiter_user');
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       const saved = sessionStorage.getItem('arbiter_user');
@@ -178,32 +185,21 @@ export const TelemetryProvider = ({ children }) => {
     }
   };
 
-  // Fetch initial mission state on app start or login
-  useEffect(() => {
-    let isMounted = true;
-    api.getMission().then(res => {
-      if (isMounted && res && res.phase) {
-        setMissionPhase(res.phase);
-        setMissionData(res);
-      }
-    }).catch(() => {});
-    return () => { isMounted = false; };
-  }, [user]);
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('arbiter_router_settings');
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) {}
+      } catch (e) { }
     }
     return MOCK_ROUTER_SETTINGS;
   });
 
   const [queue, setQueue] = useState(() => computePriorityQueue(MOCK_QUEUE, MOCK_TELEMETRY, settings));
   const [decisions, setDecisions] = useState(() => processDecisions(MOCK_DECISIONS));
-  const [passes, setPasses] = useState(MOCK_PASS_HISTORY);
-  const [scenarios, setScenarios] = useState(MOCK_SCENARIOS);
-  const [validationRuns, setValidationRuns] = useState(MOCK_VALIDATION_RUNS);
+  const [passes, setPasses] = useState(() => (user ? [] : []));
+  const [scenarios, setScenarios] = useState(() => (user ? [] : []));
+  const [validationRuns, setValidationRuns] = useState(() => (user ? [] : []));
   const [isPolling, setIsPolling] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
@@ -306,13 +302,14 @@ export const TelemetryProvider = ({ children }) => {
 
     const finalQueue = computePriorityQueue(remainingQueue, nextTelemetry, settings);
 
-    // Build local decision object
+    // Build local decision object with downlinkId
     const dispatchedType = dispatched ? dispatched.type : 'TTC';
     const dispatchedScore = dispatched ? dispatched.priorityScore : 100;
     const decId = `DEC-${now.getTime().toString().slice(-4)}`;
     const localDec = {
       id: decId,
       decisionId: decId,
+      downlinkId: `DWN-${now.getTime().toString().slice(-4)}-${Math.floor(100 + Math.random() * 900)}`,
       timestamp: nowStr,
       createdAt: now.toISOString(),
       selectedType: dispatchedType,
@@ -330,59 +327,83 @@ export const TelemetryProvider = ({ children }) => {
     setLastUpdated(now);
   };
 
-  // Initial load of pass history, scenarios, validation runs, and router settings from backend with fallback
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        const [fetchedPasses, fetchedScenarios, fetchedRuns, fetchedSettingsData] = await Promise.all([
-          api.getPasses(),
-          api.getScenarios(),
-          api.getValidationRuns(),
-          request('/settings').catch((err) => {
-            console.warn('[TelemetryContext] Initial settings fetch warning (offline/fallback):', err);
-            return null;
-          })
-        ]);
-        if (Array.isArray(fetchedPasses)) setPasses(fetchedPasses);
-        if (Array.isArray(fetchedScenarios)) setScenarios(fetchedScenarios);
-        if (Array.isArray(fetchedRuns)) setValidationRuns(fetchedRuns);
+  // Fetch protected data immediately when user is logged in
+  const fetchProtectedData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const [fetchedPasses, fetchedScenarios, fetchedRuns, fetchedSettingsData, fetchedMission] = await Promise.allSettled([
+        api.getPasses(),
+        api.getScenarios(),
+        api.getValidationRuns(),
+        request('/settings'),
+        api.getMission()
+      ]);
 
-        if (fetchedSettingsData) {
-          const raw = fetchedSettingsData.settings || fetchedSettingsData;
-          const rawWeights = raw.baseWeights || raw.weights || {};
-          const mappedSettings = {
-            ...raw,
-            baseWeights: {
-              TTC: typeof rawWeights.TTC === 'number' ? rawWeights.TTC : 100,
-              SSTV: typeof rawWeights.SSTV === 'number' ? rawWeights.SSTV : 60,
-              Codec2: typeof rawWeights.Codec2 === 'number' ? rawWeights.Codec2 : 40,
-              M17: typeof rawWeights.M17 === 'number' ? rawWeights.M17 : 30
-            },
-            ttcStarvationTimeoutSec: typeof raw.ttcStarvationTimeoutSec === 'number'
-              ? raw.ttcStarvationTimeoutSec
-              : 120,
-            batteryThresholdLow: typeof raw.batteryThresholdLow === 'number'
-              ? raw.batteryThresholdLow
-              : 30
-          };
-          setSettings(mappedSettings);
-          setQueue(prevQueue => computePriorityQueue(prevQueue, telemetryRef.current, mappedSettings));
-          try {
-            localStorage.setItem('arbiter_router_settings', JSON.stringify(mappedSettings));
-          } catch (e) {}
-        }
-      } catch (err) {
-        console.warn('[TelemetryContext] Initial fetch warning:', err);
-      } finally {
-        setSettingsLoaded(true);
+      if (fetchedPasses.status === 'fulfilled' && Array.isArray(fetchedPasses.value)) {
+        setPasses(fetchedPasses.value);
       }
-    };
-    fetchInitialData();
-  }, []);
+      if (fetchedScenarios.status === 'fulfilled' && Array.isArray(fetchedScenarios.value)) {
+        setScenarios(fetchedScenarios.value);
+      }
+      if (fetchedRuns.status === 'fulfilled' && Array.isArray(fetchedRuns.value)) {
+        setValidationRuns(fetchedRuns.value);
+      }
+      if (fetchedSettingsData.status === 'fulfilled' && fetchedSettingsData.value) {
+        const raw = fetchedSettingsData.value.settings || fetchedSettingsData.value;
+        const rawWeights = raw.baseWeights || raw.weights || {};
+        const mappedSettings = {
+          ...raw,
+          baseWeights: {
+            TTC: typeof rawWeights.TTC === 'number' ? rawWeights.TTC : 100,
+            SSTV: typeof rawWeights.SSTV === 'number' ? rawWeights.SSTV : 60,
+            Codec2: typeof rawWeights.Codec2 === 'number' ? rawWeights.Codec2 : 40,
+            M17: typeof rawWeights.M17 === 'number' ? rawWeights.M17 : 30
+          },
+          ttcStarvationTimeoutSec: typeof raw.ttcStarvationTimeoutSec === 'number'
+            ? raw.ttcStarvationTimeoutSec
+            : 120,
+          batteryThresholdLow: typeof raw.batteryThresholdLow === 'number'
+            ? raw.batteryThresholdLow
+            : 30
+        };
+        setSettings(mappedSettings);
+        setQueue(prevQueue => computePriorityQueue(prevQueue, telemetryRef.current, mappedSettings));
+        try {
+          localStorage.setItem('arbiter_router_settings', JSON.stringify(mappedSettings));
+        } catch (e) { }
+      }
+      if (fetchedMission.status === 'fulfilled' && fetchedMission.value && fetchedMission.value.phase) {
+        const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production';
+        if (fetchedMission.value.isFallback && isProduction) {
+          setMissionPhase('PRE_DEPLOYMENT');
+        } else {
+          setMissionPhase(fetchedMission.value.phase);
+          setMissionData(fetchedMission.value);
+        }
+      }
+    } catch (err) {
+      console.warn('[TelemetryContext] Protected data fetch warning:', err);
+    } finally {
+      setSettingsLoaded(true);
+    }
+  }, [user]);
 
-  // Polling loop (every 3s): try backend live data first, fallback to simulateLiveTick() if backend is offline
+  // Synchronize protected data when user changes: fetch immediately if logged in, clear on logout
   useEffect(() => {
-    if (!isPolling) return;
+    if (user) {
+      fetchProtectedData();
+    } else {
+      setPasses([]);
+      setScenarios([]);
+      setValidationRuns([]);
+      setMissionData(null);
+      setMissionPhase('PRE_DEPLOYMENT');
+    }
+  }, [user, fetchProtectedData]);
+
+  // Polling loop (every 3s): only poll protected endpoints when user is authenticated
+  useEffect(() => {
+    if (!isPolling || !user) return;
 
     const pollBackendOrSimulate = async () => {
       try {
@@ -513,10 +534,15 @@ export const TelemetryProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
+    setPasses([]);
+    setScenarios([]);
+    setValidationRuns([]);
+    setMissionData(null);
+    setMissionPhase('PRE_DEPLOYMENT');
     try {
       sessionStorage.removeItem('arbiter_user');
       localStorage.removeItem('arbiter_user');
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const issueOverride = async (mode) => {
@@ -612,7 +638,7 @@ export const TelemetryProvider = ({ children }) => {
     setQueue(prevQueue => computePriorityQueue(prevQueue, telemetry, newSettings));
     try {
       localStorage.setItem('arbiter_router_settings', JSON.stringify(newSettings));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const createNewPass = async () => {
@@ -716,7 +742,9 @@ export const TelemetryProvider = ({ children }) => {
         runScenarioTest,
         addScenario,
         saveRouterSettings,
-        createNewPass
+        createNewPass,
+        setPasses,
+        refetchPasses: fetchProtectedData
       }}
     >
       {children}

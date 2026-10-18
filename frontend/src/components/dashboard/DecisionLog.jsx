@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useTelemetry } from '../../context/TelemetryContext';
 import { api } from '../../api/client';
 import { DownlinkDetailModal } from '../downlink/DownlinkDetailModal';
-import { Cpu, UserCheck, Eye } from 'lucide-react';
+import { Cpu, UserCheck, Eye, Loader2 } from 'lucide-react';
 
 export const DecisionLog = () => {
   const { decisions } = useTelemetry();
   const [selectedDownlink, setSelectedDownlink] = useState(null);
   const [loadingDownlinkId, setLoadingDownlinkId] = useState(null);
   const [downlinkStatuses, setDownlinkStatuses] = useState({});
+  const [downlinkError, setDownlinkError] = useState({});
 
   // Sync latest downlink statuses for quick chip display
   useEffect(() => {
@@ -40,52 +41,47 @@ export const DecisionLog = () => {
   const handleViewData = async (dec) => {
     const decId = dec.id || dec.decisionId;
     setLoadingDownlinkId(decId);
+    setDownlinkError(prev => ({ ...prev, [decId]: null }));
+
     try {
-      let dwn = await api.getDownlinkByDecision(decId);
-      if (!dwn && dec.downlinkId) {
-        dwn = await api.getDownlink(dec.downlinkId);
+      let dwn = null;
+      try {
+        dwn = await api.getDownlinkByDecision(decId);
+      } catch (err) {
+        if (err && err.status === 404) {
+          // Retry once after 1 s if downlink is not saved yet
+          await new Promise(r => setTimeout(r, 1000));
+          try {
+            dwn = await api.getDownlinkByDecision(decId);
+          } catch (retryErr) {
+            if (retryErr && retryErr.status === 404) {
+              setDownlinkError(prev => ({
+                ...prev,
+                [decId]: 'Data still arriving, try again in a moment'
+              }));
+              return;
+            }
+            throw retryErr;
+          }
+        } else {
+          throw err;
+        }
       }
+
       if (dwn) {
         setSelectedDownlink(dwn);
       } else {
-        // Fallback local representation if not found in db/memory
-        const determinedStatus = dec.downlinkStatus || downlinkStatuses[decId] || downlinkStatuses[dec.downlinkId] || 'RECEIVED';
-        setSelectedDownlink({
-          downlinkId: dec.downlinkId || 'DWN-LIVE',
-          decisionId: decId,
-          passId: dec.passId,
-          type: dec.selectedType,
-          label: `${dec.selectedType} Payload Transmission`,
-          sizeKb: dec.selectedType === 'TTC' ? 14 : dec.selectedType === 'SSTV' ? 450 : 48,
-          status: determinedStatus,
-          linkQualityAtSend: 82,
-          ackReceived: determinedStatus !== 'LOST',
-          ackLatencyMs: determinedStatus !== 'LOST' ? 240 : null,
-          payload: dec.selectedType === 'TTC' ? {
-            batteryVoltage: 3.96,
-            batteryPercent: 82.0,
-            boardTempC: 22.5,
-            solarCurrentmA: 230,
-            rssiDbm: -84,
-            uptimeSec: 86400,
-            mode: 'NOMINAL'
-          } : dec.selectedType === 'SSTV' ? {
-            imageKey: 'sstv-01',
-            caption: 'Earth limb over the Indian Ocean',
-            quality: 85,
-            mode: 'Martin M1',
-            resolution: '320x256'
-          } : {
-            audioKey: 'voice-01',
-            transcript: 'SomaiyaSat, telemetry nominal.',
-            bitrate: '3200 bps',
-            durationSec: 6
-          },
-          createdAt: dec.createdAt || new Date()
-        });
+        setDownlinkError(prev => ({
+          ...prev,
+          [decId]: 'Data still arriving, try again in a moment'
+        }));
       }
     } catch (err) {
       console.warn('Failed to load downlink details:', err);
+      setDownlinkError(prev => ({
+        ...prev,
+        [decId]: 'Data still arriving, try again in a moment'
+      }));
     } finally {
       setLoadingDownlinkId(null);
     }
@@ -142,7 +138,7 @@ export const DecisionLog = () => {
                   {!dec.isOverridden && <span>Router Score: {dec.score}</span>}
                 </div>
 
-                {dec.downlinkId && (
+                {Boolean(dec.downlinkId) && (
                   <div className="decision-downlink-group">
                     {status === 'RECEIVED' && (
                       <span className="downlink-chip chip-green">✓ Received</span>
@@ -161,9 +157,24 @@ export const DecisionLog = () => {
                       className="btn-view-data"
                       title="Inspect demodulated downlink payload"
                     >
-                      <Eye size={12} />
-                      {loadingDownlinkId === decId ? 'Fetching...' : 'View data'}
+                      {loadingDownlinkId === decId ? (
+                        <>
+                          <Loader2 size={12} className="spin" />
+                          <span>Fetching...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye size={12} />
+                          <span>View data</span>
+                        </>
+                      )}
                     </button>
+
+                    {downlinkError[decId] && (
+                      <span className="downlink-error-notice mono">
+                        {downlinkError[decId]}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -315,6 +326,26 @@ export const DecisionLog = () => {
         .btn-view-data:disabled {
           opacity: 0.6;
           cursor: wait;
+        }
+
+        .spin {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .downlink-error-notice {
+          display: block;
+          font-size: 0.72rem;
+          color: var(--color-raspberry);
+          margin-top: 0.35rem;
+          background: rgba(185, 55, 94, 0.08);
+          padding: 0.2rem 0.5rem;
+          border-radius: 4px;
+          border-left: 2px solid var(--color-raspberry);
         }
       `}</style>
     </div>
