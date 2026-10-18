@@ -149,11 +149,11 @@ const initialPassInfo = getLocalPassInfo(new Date());
 
 let currentTelemetry = {
   battery: 84.5,
-  linkQuality: 20,
-  snr: 4.0,
+  linkQuality: 18,
+  snr: 3.6,
   activeMode: 'TTC',
   passStatus: 'ACTIVE',
-  passTimeRemainingSec: 600,
+  passTimeRemainingSec: 420,
   currentPassId: initialPassInfo.passId
 };
 
@@ -172,12 +172,12 @@ let passes = [
     date: initialPassInfo.dateStr,
     startTime: initialPassInfo.timeStr,
     endTime: 'Active',
-    durationSec: 600,
+    durationSec: 420,
     itemsSent: 0,
     overrideCount: 0,
     status: 'ACTIVE',
-    targetPeak: 88,
-    peakLinkQuality: 20,
+    targetPeak: 91,
+    peakLinkQuality: 18,
     avgBattery: 84.5,
     batterySum: 84.5,
     batteryCount: 1,
@@ -188,8 +188,8 @@ let passes = [
     passId: 'PASS-20260817-103215',
     date: '2026-08-17',
     startTime: '10:32:15',
-    endTime: '10:42:15',
-    durationSec: 600,
+    endTime: '10:39:15',
+    durationSec: 420,
     itemsSent: 2,
     overrideCount: 0,
     status: 'COMPLETED',
@@ -349,9 +349,10 @@ let tickCounter = 0;
 
 function startNewPass(now = new Date()) {
   const info = getLocalPassInfo(now);
-  const durationSec = 600;
+  const durationSec = 420;
 
-  const targetPeak = Math.floor(85 + Math.random() * 11);
+  const targetPeak = Math.floor(88 + Math.random() * 7);
+  const passInitBattery = Math.floor(82 + Math.random() * 8);
   const newPass = {
     passId: info.passId,
     date: info.dateStr,
@@ -362,9 +363,9 @@ function startNewPass(now = new Date()) {
     overrideCount: 0,
     status: 'ACTIVE',
     targetPeak,
-    peakLinkQuality: 20,
-    avgBattery: currentTelemetry.battery,
-    batterySum: currentTelemetry.battery,
+    peakLinkQuality: 18,
+    avgBattery: passInitBattery,
+    batterySum: passInitBattery,
     batteryCount: 1,
     createdAt: now,
     decisions: []
@@ -374,8 +375,17 @@ function startNewPass(now = new Date()) {
   currentTelemetry.currentPassId = info.passId;
   currentTelemetry.passTimeRemainingSec = durationSec;
   currentTelemetry.passStatus = 'ACTIVE';
-  currentTelemetry.linkQuality = 20;
-  currentTelemetry.snr = 4.0;
+  currentTelemetry.linkQuality = 18;
+  currentTelemetry.battery = passInitBattery;
+  currentTelemetry.snr = 3.6;
+
+  // Reset queue wait times so stale items don't accumulate unrecoverable wait bonuses
+  queueItems = queueItems.map(item => ({
+    ...item,
+    waitTimeSec: 0,
+    isStarved: false,
+    priorityScore: router.calculateScore({ ...item, waitTimeSec: 0 }, currentTelemetry)
+  }));
 
   if (isDbConnected()) {
     Pass.updateMany(
@@ -429,7 +439,7 @@ async function syncActivePassToDb() {
             date: activePass.date,
             startTime: activePass.startTime,
             endTime: 'Active',
-            durationSec: activePass.durationSec || 600,
+            durationSec: activePass.durationSec || 420,
             itemsSent: activePass.itemsSent || 0,
             overrideCount: activePass.overrideCount || 0,
             status: 'ACTIVE',
@@ -446,13 +456,16 @@ async function syncActivePassToDb() {
 
 function replenishQueue() {
   if (queueItems.length < 8) {
+    const existingTypes = queueItems.map(i => i.type);
     const templates = [
       { type: 'TTC', label: 'Periodic Housekeeping Beacon', sizeKb: 14, baseWeight: 100 },
       { type: 'SSTV', label: 'High-Res Earth Observation Frame', sizeKb: 480, baseWeight: 60 },
       { type: 'Codec2', label: 'Compressed Digital Voice Stream', sizeKb: 32, baseWeight: 40 },
       { type: 'M17', label: 'Telemetry Packet Batch', sizeKb: 110, baseWeight: 30 }
     ];
-    const tmpl = templates[Math.floor(Math.random() * templates.length)];
+    const missing = templates.filter(t => !existingTypes.includes(t.type));
+    const tmplPool = missing.length > 0 ? missing : templates;
+    const tmpl = tmplPool[Math.floor(Math.random() * tmplPool.length)];
     const newItemId = `Q-${Math.floor(100 + Math.random() * 900)}`;
     queueItems.push({
       id: newItemId,
@@ -486,20 +499,25 @@ async function startSimulator() {
   intervalId = setInterval(() => {
     tickCounter++;
 
-    // Fluctuate telemetry metrics according to realistic pass elevation profile
+    // Fluctuate telemetry metrics according to realistic pass elevation profile (6-8 min / 420s)
     const activePass = passes.find(p => p.passId === currentTelemetry.currentPassId);
-    const durationSec = (activePass && activePass.durationSec) ? activePass.durationSec : 600;
+    const durationSec = (activePass && activePass.durationSec) ? activePass.durationSec : 420;
     const elapsedSec = Math.max(0, durationSec - currentTelemetry.passTimeRemainingSec);
     const progress = Math.max(0, Math.min(1, elapsedSec / durationSec));
 
-    const curve = Math.pow(Math.sin(progress * Math.PI), 1.4);
-    const baseLink = 18;
-    const peakLink = (activePass && activePass.targetPeak) ? activePass.targetPeak : 88;
-    const noise = Math.floor(Math.random() * 11) - 5;
-    const newLink = Math.max(5, Math.min(100, Math.round(baseLink + (peakLink - baseLink) * curve + noise)));
+    // Smooth elevation curve: starts ~17%, peaks at 88-94% at mid-pass, falls back to ~17% at end
+    const sinVal = Math.sin(progress * Math.PI);
+    const curve = Math.pow(sinVal, 1.15);
+    const baseLink = 17;
+    const peakLink = (activePass && activePass.targetPeak) ? activePass.targetPeak : 91;
+    const noise = Math.floor(Math.random() * 5) - 2;
+    const newLink = Math.max(12, Math.min(98, Math.round(baseLink + (peakLink - baseLink) * curve + noise)));
 
-    const batDelta = (currentTelemetry.activeMode === 'SSTV' ? -0.3 : -0.1) + 0.05;
-    const newBat = Math.max(15, Math.min(100, Math.round((currentTelemetry.battery + batDelta) * 10) / 10));
+    // Battery dynamics: solar panel array charges in sunlight while payloads draw power
+    const solarGen = 0.12;
+    const powerDrain = currentTelemetry.activeMode === 'SSTV' ? 0.30 : (currentTelemetry.activeMode === 'TTC' ? 0.08 : 0.10);
+    const batDelta = solarGen - powerDrain;
+    const newBat = Math.max(25, Math.min(98, Math.round((currentTelemetry.battery + batDelta) * 10) / 10));
 
     currentTelemetry.linkQuality = newLink;
     currentTelemetry.battery = newBat;
@@ -538,7 +556,7 @@ async function startSimulator() {
                 date: activePass.date,
                 startTime: activePass.startTime,
                 endTime: activePass.endTime,
-                durationSec: activePass.durationSec || 600,
+                durationSec: activePass.durationSec || 420,
                 itemsSent: activePass.itemsSent,
                 overrideCount: activePass.overrideCount,
                 status: 'COMPLETED',
@@ -596,6 +614,9 @@ async function startSimulator() {
     let dispatchedItem = null;
     if (dispatchedIndex !== -1) {
       dispatchedItem = queueItems.splice(dispatchedIndex, 1)[0];
+    } else if (queueItems.length >= 8) {
+      // Prevent queue saturation when safeguard dispatches synthetic TT&C
+      queueItems.pop();
     }
 
     // Periodically replenish queue items (every 3 ticks or if queue falls below 3 items)
