@@ -3,6 +3,7 @@ import { PageContainer } from '../components/layout/PageContainer';
 import { useTelemetry } from '../context/TelemetryContext';
 import { api } from '../api/client';
 import { DownlinkDetailModal } from '../components/downlink/DownlinkDetailModal';
+import { MissionLock } from '../components/mission/MissionLock';
 import {
   History,
   Eye,
@@ -156,8 +157,9 @@ export const PassHistory = () => {
   };
 
   return (
-    <PageContainer
-      title="GROUND PASS HISTORY LOGS"
+    <MissionLock>
+      <PageContainer
+        title="GROUND PASS HISTORY LOGS"
       subtitle="Historical log of orbital ground passes, transmission telemetry metrics, and operator overrides"
     >
       <div className="card pass-history-card">
@@ -1030,5 +1032,6 @@ export const PassHistory = () => {
         }
       `}</style>
     </PageContainer>
+    </MissionLock>
   );
 };

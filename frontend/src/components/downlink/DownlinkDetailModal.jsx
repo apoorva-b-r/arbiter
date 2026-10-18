@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   CheckCircle2,
@@ -20,6 +21,26 @@ import { TtcHealthCard } from './TtcHealthCard';
 
 export const DownlinkDetailModal = ({ downlink, onClose }) => {
   const [imageError, setImageError] = useState(false);
+
+  // Lock background scrolling while modal is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  // Close on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   if (!downlink) return null;
 
@@ -57,13 +78,19 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
   const isPartial = status === 'PARTIAL';
   const isReceived = status === 'RECEIVED';
 
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
+  const modalElement = (
+    <div
+      className="modal-backdrop"
+      onClick={onClose}
+      role="presentation"
+    >
       <div
         className="modal-content card downlink-modal"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="downlink-modal-title"
+        tabIndex={-1}
       >
         {/* Modal Header */}
         <div className="card-header downlink-modal-header">
@@ -76,7 +103,7 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
               {type}
             </span>
             <div className="title-area">
-              <h3 className="modal-title">{label}</h3>
+              <h3 id="downlink-modal-title" className="modal-title">{label}</h3>
               <div className="header-meta mono">
                 <span>ID: {downlinkId}</span>
                 <span>•</span>
@@ -377,26 +404,68 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
         </div>
 
         <style>{`
-          .downlink-modal {
-            max-width: 780px;
-            width: 95vw;
-            max-height: 90vh;
+          .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(30, 7, 43, 0.78);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            padding: 1.5rem;
+            box-sizing: border-box;
+            overflow: hidden;
+            animation: modalBackdropFadeIn 0.2s ease-out forwards;
+          }
+
+          @keyframes modalBackdropFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+
+          .modal-backdrop .downlink-modal {
+            max-width: 1080px;
+            width: 94vw;
+            max-height: 88vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             padding: 0;
             background: #FFFFFF;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 16px 40px rgba(96, 36, 55, 0.35);
+            border: 1px solid var(--border-color, #F1D3DA);
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(43, 15, 24, 0.45);
+            margin: auto;
+            animation: modalDialogSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+
+          @keyframes modalDialogSlideUp {
+            from {
+              opacity: 0;
+              transform: translateY(16px) scale(0.98);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
           }
 
           .downlink-modal-header {
             margin: 0;
-            padding: 1rem 1.4rem;
+            padding: 1.1rem 1.6rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: linear-gradient(135deg, var(--color-deep-plum), var(--color-berry-rose));
+            background: linear-gradient(135deg, var(--color-deep-plum, #602437), var(--color-berry-rose, #8A2846));
+            border-bottom: 1px solid rgba(255, 202, 212, 0.2);
+            flex-shrink: 0;
           }
 
           .header-left {
@@ -457,6 +526,8 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
             flex-direction: column;
             gap: 1.25rem;
             background-color: #FFFFFF;
+            flex: 1;
+            min-height: 0;
           }
 
           .section-title {
@@ -887,11 +958,33 @@ export const DownlinkDetailModal = ({ downlink, onClose }) => {
             .voice-tech-stats {
               grid-template-columns: 1fr;
             }
+            .modal-backdrop {
+              padding: 0.5rem;
+            }
+            .modal-backdrop .downlink-modal {
+              width: 98vw;
+              max-height: 94vh;
+              border-radius: 12px;
+            }
+            .downlink-modal-header {
+              padding: 0.85rem 1rem;
+            }
+            .downlink-modal-body {
+              padding: 1rem 1.15rem;
+            }
+            .modal-footer {
+              padding: 0.75rem 1rem;
+            }
           }
         `}</style>
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalElement, document.body);
+  }
+  return modalElement;
 };
 
 export default DownlinkDetailModal;
