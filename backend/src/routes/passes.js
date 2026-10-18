@@ -117,8 +117,18 @@ router.get('/:passId', async (req, res) => {
 router.delete('/:passId', async (req, res) => {
   try {
     const { passId } = req.params;
+    const currentPassId = simulator.getTelemetry()?.currentPassId;
+    const inMemPass = simulator.getPasses().find(p => p.passId === passId);
+
+    if (passId === currentPassId || inMemPass?.status === 'ACTIVE') {
+      return res.status(400).json({ error: 'Cannot delete the currently active pass.' });
+    }
 
     if (isDbConnected()) {
+      const dbPass = await Pass.findOne({ passId }).lean();
+      if (dbPass?.status === 'ACTIVE') {
+        return res.status(400).json({ error: 'Cannot delete the currently active pass.' });
+      }
       await Pass.deleteOne({ passId });
       await Decision.deleteMany({ passId });
     }

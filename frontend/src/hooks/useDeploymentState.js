@@ -71,7 +71,7 @@ export const VALID_TRANSITIONS = {
   OPERATIONAL: []
 };
 
-export const useDeploymentState = ({ activePassId } = {}) => {
+export const useDeploymentState = ({ activePassId, onPhaseChange } = {}) => {
   const [actualStateIndex, setActualStateIndex] = useState(0);
   const [inspectedStateIndex, setInspectedStateIndex] = useState(null);
   
@@ -111,11 +111,25 @@ export const useDeploymentState = ({ activePassId } = {}) => {
   const actualStateIndexRef = useRef(0);
   const currentRunIdRef = useRef(null);
   const activePassIdRef = useRef(activePassId);
+  const onPhaseChangeRef = useRef(onPhaseChange);
+
+  useEffect(() => {
+    onPhaseChangeRef.current = onPhaseChange;
+  }, [onPhaseChange]);
 
   // Keep activePassIdRef up-to-date
   useEffect(() => {
     activePassIdRef.current = activePassId;
   }, [activePassId]);
+
+  // Single authoritative path for mission phase updates (eliminates duplicate PUT calls)
+  const notifyPhaseChange = useCallback((phase, reason) => {
+    if (onPhaseChangeRef.current) {
+      onPhaseChangeRef.current(phase, reason, currentRunIdRef.current);
+    } else {
+      api.setMissionPhase(phase, reason, currentRunIdRef.current).catch(() => {});
+    }
+  }, []);
 
   const clearAllTimers = useCallback(() => {
     timersRef.current.forEach(t => clearTimeout(t));
@@ -268,6 +282,18 @@ export const useDeploymentState = ({ activePassId } = {}) => {
 
     if (eventText) {
       appendLog(eventText, targetState.id, logType, { from: currentState.id, to: targetState.id }, eventType, currentState.id);
+    }
+
+    // Update authoritative mission phase based on deployment progression (single path)
+    if (targetIndex === 1) {
+      // Release Triggered -> PRE_DEPLOYMENT
+      notifyPhaseChange('PRE_DEPLOYMENT', 'Launch vehicle pod release triggered');
+    } else if (targetIndex >= 2 && targetIndex <= 4) {
+      // Separation Confirmed / Initialization / Commissioning -> COMMISSIONING
+      notifyPhaseChange('COMMISSIONING', `Deployment stage reached: ${targetState.label}`);
+    } else if (targetIndex === 5) {
+      // Operational -> OPERATIONAL
+      notifyPhaseChange('OPERATIONAL', 'Satellite deployment and commissioning complete. System operational.');
     }
 
     // Reset per-step timer for the newly entered stage
@@ -456,6 +482,26 @@ export const useDeploymentState = ({ activePassId } = {}) => {
     const msg = 'Deployment confirmation unavailable: contingency escalated to Mission Director.';
     setContingencyMessage(msg);
     appendLog(msg, 'RELEASE_TRIGGERED', 'critical', { action: 'ESCALATE' }, 'CONTINGENCY_ESCALATED');
+
+    notifyPhaseChange('CONTACT_LOST', msg);
+  }, [clearAllTimers, appendLog, notifyPhaseChange]);
+
+  // Reset deployment state machine back to Stowed
+  const resetDeploymentStateMachine = useCallback(() => {
+    clearAllTimers();
+    actualStateIndexRef.current = 0;
+    setActualStateIndex(0);
+    setInspectedStateIndex(null);
+    setContingencyActive(false);
+    setContingencyStatus('NORMAL');
+    setContingencyMessage('');
+    setTimeElapsedSec(0);
+    setRetryCount(0);
+    setSecondaryBeaconChecked(false);
+    setSecondaryBeaconData(null);
+    currentRunIdRef.current = null;
+    setCurrentRun(null);
+    appendLog('Deployment state machine reset to Stowed.', 'STOWED', 'info', {}, 'STATE_RESET');
   }, [clearAllTimers, appendLog]);
 
   // Contingency Action 4: Manually Confirm Separation
@@ -508,6 +554,7 @@ export const useDeploymentState = ({ activePassId } = {}) => {
     checkSecondaryBeacon,
     escalateContingency,
     manualConfirmSeparation,
+    resetDeploymentStateMachine,
     transitionDeploymentState,
     setSelectedRunId,
     triggerContingency: (reason) => {

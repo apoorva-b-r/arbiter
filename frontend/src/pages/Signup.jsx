@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTelemetry } from '../context/TelemetryContext';
 import { Satellite, Lock, User, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { getSafeRedirectTarget } from '../utils/redirect';
 
 export const Signup = () => {
-  const { register } = useTelemetry();
+  const { register, missionPhase } = useTelemetry();
   const navigate = useNavigate();
+  const location = useLocation();
+  const defaultTarget = missionPhase === 'OPERATIONAL' ? '/dashboard' : '/deployment';
+  const from = getSafeRedirectTarget(location.state?.from, defaultTarget);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -63,7 +67,7 @@ export const Signup = () => {
     try {
       await register(username.trim(), password);
       setErrors({ username: '', password: '', confirmPassword: '' });
-      navigate('/dashboard', { replace: true });
+      navigate(from, { replace: true });
     } catch (err) {
       const status = err.status;
       const message = err.message || '';

@@ -20,10 +20,11 @@ router.get('/', async (req, res) => {
 router.post('/transition', async (req, res) => {
   try {
     const { nextStateIndex } = req.body;
-    if (nextStateIndex === undefined || nextStateIndex === null) {
-      return res.status(400).json({ error: 'Missing nextStateIndex in payload.' });
+    const idx = Number(nextStateIndex);
+    if (nextStateIndex === undefined || nextStateIndex === null || isNaN(idx) || !Number.isInteger(idx) || idx < 0 || idx > 5) {
+      return res.status(400).json({ error: 'Invalid nextStateIndex. Must be an integer between 0 and 5.' });
     }
-    const updated = deploymentMachine.transitionState(nextStateIndex);
+    const updated = deploymentMachine.transitionState(idx);
     return res.status(200).json(updated);
   } catch (err) {
     console.error('Error transitioning deployment state:', err);
@@ -45,8 +46,9 @@ router.post('/contingency/trigger', async (req, res) => {
 router.post('/contingency/resolve', async (req, res) => {
   try {
     const { action } = req.body;
-    if (!action) {
-      return res.status(400).json({ error: 'Missing action in payload.' });
+    const VALID_ACTIONS = ['RETRY', 'CHECK_SECONDARY', 'ESCALATE', 'FORCE_CONFIRM'];
+    if (!action || typeof action !== 'string' || !VALID_ACTIONS.includes(action)) {
+      return res.status(400).json({ error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` });
     }
     const updated = deploymentMachine.resolveContingency(action);
     return res.status(200).json(updated);

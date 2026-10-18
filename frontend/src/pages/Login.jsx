@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTelemetry } from '../context/TelemetryContext';
 import { Satellite, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { getSafeRedirectTarget } from '../utils/redirect';
 
 export const Login = () => {
-  const { login } = useTelemetry();
+  const { login, missionPhase } = useTelemetry();
   const navigate = useNavigate();
+  const location = useLocation();
+  const defaultTarget = missionPhase === 'OPERATIONAL' ? '/dashboard' : '/deployment';
+  const from = getSafeRedirectTarget(location.state?.from, defaultTarget);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -38,7 +42,7 @@ export const Login = () => {
     if (result.ok) {
       setErrors({ username: '', password: '' });
       setGeneralError('');
-      navigate('/dashboard', { replace: true });
+      navigate(from, { replace: true });
       return;
     }
 

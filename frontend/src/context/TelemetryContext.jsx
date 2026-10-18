@@ -137,6 +137,58 @@ export const TelemetryProvider = ({ children }) => {
   // Global Mission Data State
   const [telemetry, setTelemetry] = useState(MOCK_TELEMETRY);
   const [telemetryHistory, setTelemetryHistory] = useState(MOCK_TELEMETRY_HISTORY);
+  const [missionPhase, setMissionPhase] = useState('PRE_DEPLOYMENT');
+  const [missionData, setMissionData] = useState(null);
+
+  const updateMissionPhase = async (phase, reason, runId) => {
+    const prevPhase = missionPhase;
+    try {
+      const res = await api.setMissionPhase(phase, reason, runId);
+      if (res && res.phase) {
+        setMissionPhase(res.phase);
+        setMissionData(res);
+        return res;
+      }
+      throw new Error(res?.error || 'Failed to update mission phase');
+    } catch (err) {
+      console.error('[MISSION] Failed to update mission phase:', err);
+      // Revert to confirmed previous phase
+      setMissionPhase(prevPhase);
+      throw err;
+    }
+  };
+
+  const resetMission = async () => {
+    const prevPhase = missionPhase;
+    try {
+      const res = await api.resetMission();
+      if (res && res.phase) {
+        setMissionPhase(res.phase);
+        setMissionData(res);
+        if (deploymentStateHook?.resetDeploymentStateMachine) {
+          deploymentStateHook.resetDeploymentStateMachine();
+        }
+        return res;
+      }
+      throw new Error(res?.error || 'Failed to reset mission');
+    } catch (err) {
+      console.error('[MISSION] Failed to reset mission:', err);
+      setMissionPhase(prevPhase);
+      throw err;
+    }
+  };
+
+  // Fetch initial mission state on app start or login
+  useEffect(() => {
+    let isMounted = true;
+    api.getMission().then(res => {
+      if (isMounted && res && res.phase) {
+        setMissionPhase(res.phase);
+        setMissionData(res);
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [user]);
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('arbiter_router_settings');
     if (saved) {
@@ -170,7 +222,10 @@ export const TelemetryProvider = ({ children }) => {
   }, [settings]);
 
   // Dedicated Satellite Deployment State Machine Hook
-  const deploymentStateHook = useDeploymentState({ activePassId: telemetry?.currentPassId });
+  const deploymentStateHook = useDeploymentState({
+    activePassId: telemetry?.currentPassId,
+    onPhaseChange: updateMissionPhase
+  });
   const {
     deployment,
     inspectState,
@@ -334,14 +389,24 @@ export const TelemetryProvider = ({ children }) => {
         const telData = await api.getTelemetry();
         const activePassId = telData?.currentPassId || telemetryRef.current?.currentPassId;
 
-        const [histData, queueData, decData] = await Promise.all([
+        const [histData, queueData, decData, missionDataRes] = await Promise.all([
           api.getTelemetryHistory(),
           api.getQueue(),
-          api.getDecisions(activePassId, 20)
+          api.getDecisions(activePassId, 20),
+          api.getMission()
         ]);
 
         if (telData) {
           setTelemetry(telData);
+        }
+        if (missionDataRes && missionDataRes.phase) {
+          const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production';
+          if (missionDataRes.isFallback && isProduction) {
+            setMissionPhase('PRE_DEPLOYMENT');
+          } else {
+            setMissionPhase(missionDataRes.phase);
+            setMissionData(missionDataRes);
+          }
         }
         if (Array.isArray(histData) && histData.length > 0) {
           setTelemetryHistory(histData);
@@ -402,7 +467,14 @@ export const TelemetryProvider = ({ children }) => {
         return { ok: false, error: err.message || 'Server error. Please try again.' };
       }
 
-      // Backend completely unreachable (network error or timeout): fallback to local credential check
+      // Security: Offline demo fallback is strictly prohibited in production mode.
+      // In production, the system must fail closed when the authentication datastore or backend is unreachable.
+      const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production';
+      if (isProduction) {
+        return { ok: false, error: 'Authentication service unavailable.' };
+      }
+
+      // Backend completely unreachable (network error or timeout) in development/demo mode:
       const validUsername = 'Operator-Alpha';
       const validPassword = 'Arbiter2026!';
 
@@ -611,6 +683,10 @@ export const TelemetryProvider = ({ children }) => {
         register,
         logout,
         backendOnline,
+        missionPhase,
+        missionData,
+        setMissionPhase: updateMissionPhase,
+        resetMission,
         telemetry,
         telemetryHistory,
         queue,

@@ -6,6 +6,7 @@ import { QueuePanel } from '../components/dashboard/QueuePanel';
 import { DecisionLog } from '../components/dashboard/DecisionLog';
 import { OverridePanel } from '../components/dashboard/OverridePanel';
 import { useTelemetry } from '../context/TelemetryContext';
+import { MissionLock } from '../components/mission/MissionLock';
 
 export const Dashboard = () => {
   const { isPolling, setIsPolling, lastUpdated } = useTelemetry();
@@ -29,7 +30,8 @@ export const Dashboard = () => {
   );
 
   return (
-    <PageContainer
+    <MissionLock>
+      <PageContainer
       title="ARBITER GROUND STATION DASHBOARD"
       subtitle="Real-time PocketQube telemetry, AI priority router telemetry queue, and operator override controls"
       actions={actions}
@@ -86,5 +88,6 @@ export const Dashboard = () => {
         }
       `}</style>
     </PageContainer>
+    </MissionLock>
   );
 };

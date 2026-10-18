@@ -1,13 +1,17 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageContainer } from '../components/layout/PageContainer';
 import { StateMachineView } from '../components/deployment/StateMachineView';
 import { ContingencyBanner } from '../components/deployment/ContingencyBanner';
 import { useTelemetry } from '../context/TelemetryContext';
-import { Rocket, Clock, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Rocket, Clock, ShieldAlert, CheckCircle2, RotateCcw } from 'lucide-react';
 
 export const Deployment = () => {
+  const navigate = useNavigate();
   const {
     deployment,
+    missionPhase,
+    resetMission,
     inspectState,
     clearInspection,
     runLaunchSequenceDemo,
@@ -19,12 +23,64 @@ export const Deployment = () => {
     resolveContingencyAction
   } = useTelemetry();
 
+  const handleResetMission = () => {
+    if (window.confirm('Reset mission back to PRE_DEPLOYMENT and reset the deployment state machine to Stowed?')) {
+      resetMission();
+    }
+  };
+
+  const headerActions = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <button
+        onClick={handleResetMission}
+        className="btn btn-sm btn-outline"
+        title="Reset mission to initial pre-deployment state"
+        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', borderColor: 'rgba(255, 202, 212, 0.4)', color: 'var(--color-soft-blush)' }}
+      >
+        <RotateCcw size={14} />
+        <span>Reset Mission</span>
+      </button>
+    </div>
+  );
+
   return (
     <PageContainer
       title="DEPLOYMENT HANDOVER STATE MACHINE CONSOLE"
       subtitle="Launch vehicle deployment sequence tracking, separation confirmation, and emergency contingency protocols"
+      actions={headerActions}
     >
       <div className="deployment-grid">
+        {/* Operational Success Banner */}
+        {missionPhase === 'OPERATIONAL' && (
+          <div className="card" style={{
+            background: 'linear-gradient(135deg, rgba(46, 125, 50, 0.25) 0%, rgba(20, 40, 25, 0.4) 100%)',
+            border: '1px solid rgba(76, 175, 80, 0.5)',
+            padding: '1rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <CheckCircle2 size={24} style={{ color: '#4caf50' }} />
+              <div>
+                <strong style={{ color: '#81c784', fontSize: '1rem' }}>SomaiyaSat is operational. Downlink unlocked.</strong>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Handover sequence complete. PocketQube transmitting telemetry, AI priority decisions active.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="btn btn-sm btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              Go to Dashboard →
+            </button>
+          </div>
+        )}
+
         {/* Contingency Alert Banner */}
         {deployment.contingencyActive && (
           <ContingencyBanner

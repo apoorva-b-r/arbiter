@@ -80,11 +80,11 @@ export async function withFallback(apiCall, mockValue) {
   try {
     return await apiCall();
   } catch (err) {
-    if (err && err.status === 401) {
+    if (err && (err.status === 401 || err.status === 403)) {
       throw err;
     }
-    console.warn('[API] backend offline, using mock', err);
-    return typeof mockValue === 'function' ? mockValue() : mockValue;
+    console.warn('[API] backend offline or error, evaluating fallback', err.message || err);
+    return typeof mockValue === 'function' ? mockValue(err) : mockValue;
   }
 }
 
@@ -395,5 +395,49 @@ export const api = {
       body: JSON.stringify({ username, password })
     });
     return data;
+  },
+
+  // Mission System API
+  getMission: async () => {
+    return withFallback(async () => {
+      return await request('/mission');
+    }, (err) => {
+      const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production';
+      // In production or when the server returns an actual 5xx error, fail closed
+      if (isProduction || (err && err.status >= 500)) {
+        return { phase: 'PRE_DEPLOYMENT', history: [], isFallback: true, offline: true };
+      }
+      // Isolated development simulation fallback: initial state is PRE_DEPLOYMENT
+      return { phase: 'PRE_DEPLOYMENT', history: [], isFallback: true, offline: true };
+    });
+  },
+
+  setMissionPhase: async (phase, reason, runId) => {
+    return withFallback(async () => {
+      return await request('/mission/phase', {
+        method: 'PUT',
+        body: JSON.stringify({ phase, reason, deploymentRunId: runId })
+      });
+    }, (err) => {
+      const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production';
+      if (isProduction || (err && err.status >= 500)) {
+        throw new Error(err?.message || 'Database offline: mission phase update cannot be persisted.');
+      }
+      return { phase, history: [], isFallback: true, offline: true };
+    });
+  },
+
+  resetMission: async () => {
+    return withFallback(async () => {
+      return await request('/mission/reset', {
+        method: 'POST'
+      });
+    }, (err) => {
+      const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production';
+      if (isProduction || (err && err.status >= 500)) {
+        throw new Error(err?.message || 'Database offline: mission reset cannot be persisted.');
+      }
+      return { phase: 'PRE_DEPLOYMENT', history: [], isFallback: true, offline: true };
+    });
   }
 };

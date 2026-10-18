@@ -1,14 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const simulator = require('../services/simulator');
+const mission = require('../services/mission');
 const Decision = require('../models/Decision');
 const { isDbConnected } = require('../db');
 
 router.post('/', async (req, res) => {
   try {
     const { mode } = req.body;
-    if (!mode) {
-      return res.status(400).json({ error: 'Missing transmission mode in payload.' });
+    const VALID_MODES = ['TTC', 'SSTV', 'Codec2', 'M17'];
+    if (!mode || typeof mode !== 'string' || !VALID_MODES.includes(mode)) {
+      return res.status(400).json({
+        error: `Invalid transmission mode. Must be one of: ${VALID_MODES.join(', ')}`
+      });
+    }
+
+    if (!mission.isOperational()) {
+      return res.status(403).json({
+        error: 'Manual transmission override rejected: satellite is not operational.'
+      });
     }
 
     const result = simulator.applyOverride(mode);
@@ -37,6 +47,9 @@ router.post('/', async (req, res) => {
       message: `Operator manual override issued: ${mode}`
     });
   } catch (err) {
+    if (err && err.status === 403) {
+      return res.status(403).json({ error: err.message });
+    }
     console.error('Error applying operator override:', err);
     return res.status(500).json({ error: 'Failed to process override command.' });
   }

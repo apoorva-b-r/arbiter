@@ -8,7 +8,14 @@ function requireAuth(req, res, next) {
   }
 
   const token = authHeader.slice(7).trim();
-  const secret = process.env.JWT_SECRET || 'arbiter-dev-secret';
+  if (!token) {
+    return res.status(401).json({ error: 'Login required' });
+  }
+  const isProd = process.env.NODE_ENV === 'production';
+  const secret = process.env.JWT_SECRET || (isProd ? null : 'arbiter-dev-secret');
+  if (!secret) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 
   try {
     const decoded = jwt.verify(token, secret);

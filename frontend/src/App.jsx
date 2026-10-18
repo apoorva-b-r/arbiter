@@ -4,7 +4,8 @@ import {
   BrowserRouter,
   Routes,
   Route,
-  Navigate
+  Navigate,
+  useLocation
 } from 'react-router-dom';
 
 import {
@@ -22,6 +23,7 @@ import { ReceivedData } from './pages/ReceivedData';
 import { Validation } from './pages/Validation';
 import { Deployment } from './pages/Deployment';
 import { Settings } from './pages/Settings';
+import { getSafeRedirectTarget } from './utils/redirect';
 
 
 // ---------------------------------------------------------
@@ -29,9 +31,10 @@ import { Settings } from './pages/Settings';
 // ---------------------------------------------------------
 const ProtectedLayout = ({ children }) => {
   const { user } = useTelemetry();
+  const location = useLocation();
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return (
@@ -50,10 +53,13 @@ const ProtectedLayout = ({ children }) => {
 // Prevent logged-in users from visiting the login page
 // ---------------------------------------------------------
 const PublicRoute = ({ children }) => {
-  const { user } = useTelemetry();
+  const { user, missionPhase } = useTelemetry();
+  const location = useLocation();
+  const defaultTarget = missionPhase === 'OPERATIONAL' ? '/dashboard' : '/deployment';
+  const from = getSafeRedirectTarget(location.state?.from, defaultTarget);
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={from} replace />;
   }
 
   return children;
@@ -61,11 +67,15 @@ const PublicRoute = ({ children }) => {
 
 
 // ---------------------------------------------------------
-// Redirect landing and unknown paths: /dashboard if logged in, /login if logged out
+// Redirect landing and unknown paths: /deployment or /dashboard if logged in, /login if logged out
 // ---------------------------------------------------------
 const RootRedirect = () => {
-  const { user } = useTelemetry();
-  return <Navigate to={user ? "/dashboard" : "/login"} replace />;
+  const { user, missionPhase } = useTelemetry();
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  const landingPath = missionPhase === 'OPERATIONAL' ? '/dashboard' : '/deployment';
+  return <Navigate to={landingPath} replace />;
 };
 
 

@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
 const router = require('./router');
+const mission = require('./mission');
 const { isDbConnected } = require('../db');
 const Decision = require('../models/Decision');
 const Pass = require('../models/Pass');
@@ -561,6 +562,11 @@ async function startSimulator() {
     });
     if (telemetryHistory.length > 30) telemetryHistory.shift();
 
+    // Mission Phase Guard: keep telemetry ticking (battery/link) but do NOT dispatch, create decisions, or create downlinks
+    if (!mission.isOperational()) {
+      return;
+    }
+
     // Tick queue wait times
     queueItems = queueItems.map(item => {
       const wait = item.waitTimeSec + 3;
@@ -660,6 +666,12 @@ function getPasses() { return passes; }
 function getDownlinks() { return downlinkLog; }
 
 function applyOverride(mode) {
+  if (!mission.isOperational()) {
+    const err = new Error('Manual transmission override rejected: satellite is not operational.');
+    err.status = 403;
+    throw err;
+  }
+
   currentTelemetry.activeMode = mode;
 
   // Remove item of dispatched mode from queue if present

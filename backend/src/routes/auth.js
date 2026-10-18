@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { sanitizeLog } = require('../utils/sanitizeLog');
 
 const router = express.Router();
 
@@ -16,6 +17,32 @@ router.post('/login', async (req, res) => {
   }
 
   if (mongoose.connection.readyState !== 1) {
+    // In production, the backend MUST strictly fail closed when MongoDB is unavailable
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({
+        error: 'Database offline'
+      });
+    }
+
+    // Permitted development/demo fallback (strictly non-production, only if explicitly enabled)
+    if (process.env.ENABLE_OFFLINE_DEV_AUTH === 'true') {
+      if (username === 'Operator-Alpha' && password === 'Arbiter2026!') {
+        const secret = process.env.JWT_SECRET || 'arbiter-dev-secret';
+        const token = jwt.sign(
+          { username: 'Operator-Alpha', role: 'operator' },
+          secret,
+          { expiresIn: '8h' }
+        );
+        return res.status(200).json({
+          username: 'Operator-Alpha',
+          role: 'operator',
+          token,
+          warning: 'Development offline authentication fallback active'
+        });
+      }
+      return res.status(401).json({ error: 'Incorrect Operator ID or passcode' });
+    }
+
     return res.status(503).json({
       error: 'Database offline'
     });
@@ -30,9 +57,15 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    const secret = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? null : 'arbiter-dev-secret');
+    if (!secret) {
+      console.error('[AUTH ERROR] Missing secure JWT_SECRET in production environment');
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
     const token = jwt.sign(
       { username: user.username, role: user.role },
-      process.env.JWT_SECRET || 'arbiter-dev-secret',
+      secret,
       { expiresIn: '8h' }
     );
 
@@ -42,7 +75,7 @@ router.post('/login', async (req, res) => {
       token
     });
   } catch (error) {
-    console.error('[AUTH] Login failed:', error.message);
+    console.error('[AUTH] Login failed:', sanitizeLog(error.message));
     return res.status(500).json({
       error: 'Internal server error'
     });
@@ -100,9 +133,15 @@ router.post('/register', async (req, res) => {
       role: 'operator'
     });
 
+    const secret = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? null : 'arbiter-dev-secret');
+    if (!secret) {
+      console.error('[AUTH ERROR] Missing secure JWT_SECRET in production environment');
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
     const token = jwt.sign(
       { username: user.username, role: user.role },
-      process.env.JWT_SECRET || 'arbiter-dev-secret',
+      secret,
       { expiresIn: '8h' }
     );
 
@@ -112,7 +151,7 @@ router.post('/register', async (req, res) => {
       token
     });
   } catch (error) {
-    console.error('[AUTH] Registration failed:', error.message);
+    console.error('[AUTH] Registration failed:', sanitizeLog(error.message));
     return res.status(500).json({
       error: 'Internal server error'
     });

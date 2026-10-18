@@ -3,6 +3,7 @@ import { PageContainer } from '../components/layout/PageContainer';
 import { useTelemetry } from '../context/TelemetryContext';
 import { api } from '../api/client';
 import { DownlinkDetailModal } from '../components/downlink/DownlinkDetailModal';
+import { MissionLock } from '../components/mission/MissionLock';
 import {
   Inbox,
   Filter,
@@ -103,7 +104,8 @@ export const ReceivedData = () => {
   };
 
   return (
-    <PageContainer
+    <MissionLock>
+      <PageContainer
       title="RECEIVED DATA ARCHIVE"
       subtitle="Demodulated payload stream from SomaiyaSat: SSTV images, digital speech frames, and TT&C telemetry"
       actions={
@@ -971,6 +973,7 @@ export const ReceivedData = () => {
         }
       `}</style>
     </PageContainer>
+    </MissionLock>
   );
 };
 
